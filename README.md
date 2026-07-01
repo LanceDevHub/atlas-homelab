@@ -99,9 +99,9 @@ Abgeschlossen:
 
 Als Nächstes:
 
-- Git konfigurieren
-- Docker installieren
-- Docker Compose
-- Projektstruktur auf dem Server
-- Erste Infrastruktur-Container
+- Git installieren und konfigurieren
+- Docker Engine installieren
+- Docker Compose einrichten
+- Serverstruktur definieren
+- Ersten Container bereitstellen
 
