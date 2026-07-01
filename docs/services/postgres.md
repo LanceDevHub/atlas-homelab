@@ -74,4 +74,4 @@ Ein direkter Zugriff aus dem Internet ist nicht vorgesehen.
 
 ## Status
 
-🚧 Einrichtung läuft.
+✅ PostgreSQL erfolgreich eingerichtet
