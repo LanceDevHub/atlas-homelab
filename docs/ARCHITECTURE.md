@@ -2,7 +2,7 @@
 
 Dieses Dokument beschreibt die grundlegende Architektur von Atlas.
 
-Es dient als technische Referenz für den Aufbau der Plattform und definiert die Struktur, nach der neue Dienste und Projekte integriert werden.
+Es dient als technische Referenz für den Aufbau der Plattform und definiert die Prinzipien sowie die Struktur, nach denen Infrastruktur und Projekte organisiert werden.
 
 Die Architektur soll langfristig Stabilität, Erweiterbarkeit und Wartbarkeit gewährleisten.
 
@@ -15,12 +15,13 @@ Atlas basiert auf folgenden Grundprinzipien:
 - Trennung von Infrastruktur und Projekten
 - Containerisierung aller Anwendungen
 - Reproduzierbare Konfigurationen
+- Klare Verantwortlichkeiten
 - Zentrale Dokumentation
-- Erweiterbarkeit ohne bestehende Dienste zu beeinflussen
+- Erweiterbarkeit ohne Beeinflussung bestehender Dienste
 
 ---
 
-# Architekturebenen
+# Systemübersicht
 
 Atlas besteht aus mehreren logisch getrennten Ebenen.
 
@@ -29,33 +30,32 @@ Atlas besteht aus mehreren logisch getrennten Ebenen.
                       │
         ┌─────────────┴─────────────┐
         │                           │
-    Infrastruktur               Projekte
+ Infrastruktur                 Projekte
         │                           │
-Docker Compose             CrewSync
-PostgreSQL                 AudioTagger
-Redis                      APIs
-Monitoring                 Experimente
-Reverse Proxy
+ Container-Plattform        Eigene Anwendungen
+ Gemeinsame Dienste         APIs
+ Netzwerke                  Tools
+ Speicher                   Experimente
 ```
+
+Jede Ebene besitzt eine klar definierte Aufgabe und kann unabhängig weiterentwickelt werden.
 
 ---
 
 # Komponenten
 
-Die Plattform wird in zwei Bereiche unterteilt.
-
 ## Infrastruktur
 
-Dienste, die von mehreren Projekten genutzt werden.
+Die Infrastruktur stellt gemeinsam genutzte Dienste bereit, die von mehreren Projekten verwendet werden können.
 
 Beispiele:
 
-- Docker
-- PostgreSQL
-- Redis
+- Container-Plattform
+- Datenbanken
 - Reverse Proxy
 - Monitoring
 - Backup
+- Automatisierung
 
 Diese Komponenten bilden das Fundament der Plattform.
 
@@ -63,36 +63,50 @@ Diese Komponenten bilden das Fundament der Plattform.
 
 ## Projekte
 
-Eigenständige Anwendungen.
+Projekte sind eigenständige Anwendungen, die auf der Infrastruktur aufbauen.
 
-Jedes Projekt besitzt seine eigene Dokumentation sowie seine eigene Konfiguration.
+Jedes Projekt besitzt:
 
-Projekte können unabhängig voneinander entwickelt, gestartet oder entfernt werden.
+- ein eigenes Git-Repository
+- eine eigene Dokumentation
+- eine eigene Konfiguration
+- einen eigenen Lebenszyklus
+
+Projekte können unabhängig voneinander entwickelt, gestartet, aktualisiert oder entfernt werden.
 
 ---
 
-# Datenstruktur
+# Verzeichnisstruktur
 
-Atlas trennt Konfigurationen, Daten und Projekte voneinander.
+Atlas verwendet unter `/opt/atlas` eine zentrale Verzeichnisstruktur.
 
-Die endgültige Verzeichnisstruktur wird im Laufe des Projekts definiert.
+```text
+/opt/atlas
+├── backups/       # Backups und Sicherungen
+├── compose/       # Docker Compose Stacks
+├── data/          # Persistente Daten der Container
+├── logs/          # Eigene Logdateien
+├── repositories/  # Git-Repositories
+└── scripts/       # Hilfsskripte
+```
 
-Grundsätzlich wird zwischen folgenden Bereichen unterschieden:
+## Grundsätze
 
-- Infrastruktur
-- Compose-Dateien
-- Projektdaten
-- Backups
-- Skripte
-- Dokumentation
+- Compose-Dateien werden ausschließlich unter `compose/` abgelegt.
+- Persistente Daten werden ausschließlich unter `data/` gespeichert.
+- Git-Repositories liegen unter `repositories/`.
+- Backups werden zentral unter `backups/` verwaltet.
+- Eigene Skripte werden unter `scripts/` abgelegt.
 
 ---
 
 # Erweiterbarkeit
 
-Neue Projekte sollen ohne Änderungen an der bestehenden Infrastruktur integriert werden können.
+Atlas ist modular aufgebaut.
 
-Neue Infrastruktur-Dienste werden nur aufgenommen, wenn sie mehreren Projekten einen Mehrwert bieten.
+Neue Projekte können unabhängig von der bestehenden Infrastruktur integriert werden.
+
+Neue Infrastruktur-Dienste werden nur aufgenommen, wenn sie mehreren Projekten einen Mehrwert bieten oder den Betrieb der Plattform verbessern.
 
 ---
 
@@ -105,3 +119,4 @@ Die Architektur verfolgt folgende Ziele:
 - klare Verantwortlichkeiten
 - saubere Dokumentation
 - langfristige Erweiterbarkeit
+- modulare Entwicklung
