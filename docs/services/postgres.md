@@ -2,26 +2,27 @@
 
 ## Zweck
 
-PostgreSQL dient als zentrale relationale Datenbank der Atlas-Plattform.
+PostgreSQL ist die zentrale relationale Datenbank der Atlas-Plattform.
 
-Sie stellt eine persistente relationale Datenbank für gemeinsam genutzte Dienste bereit.
+Sie stellt eine persistente Datenbank für gemeinsam genutzte Infrastruktur-Dienste und zukünftige Anwendungen bereit.
+
+Aktuelle Nutzer:
+
+- n8n
 
 Geplante Nutzer:
 
-- n8n
-- zukünftige APIs
 - CrewSync
-- weitere Projekte
+- Eigene APIs
+- Weitere Projekte
 
 ---
 
-## Architektur
+# Architektur
 
-PostgreSQL wird nicht direkt auf dem Raspberry Pi installiert.
+PostgreSQL wird ausschließlich als Docker-Container betrieben.
 
-Die Datenbank wird als Docker-Container betrieben.
-
-Persistente Daten werden außerhalb des Containers gespeichert.
+Die Datenbankdateien werden außerhalb des Containers gespeichert und bleiben dadurch auch nach einem Neustart oder einer Neuerstellung des Containers erhalten.
 
 ```text
 /opt/atlas
@@ -36,42 +37,143 @@ Persistente Daten werden außerhalb des Containers gespeichert.
 
 ---
 
-## Entscheidungen
+# Docker-Integration
 
-### Containerisierung
+PostgreSQL besitzt ein eigenes Docker-Compose-Projekt.
 
-PostgreSQL wird ausschließlich als Docker-Container betrieben.
+Die Konfiguration befindet sich unter
 
-**Begründung**
+```text
+/opt/atlas/compose/postgres
+```
 
-- reproduzierbare Bereitstellung
-- einfache Updates
-- saubere Trennung von Anwendung und Hostsystem
+Die persistenten Daten werden unter
+
+```text
+/opt/atlas/data/postgres
+```
+
+gespeichert.
 
 ---
 
-### Persistente Daten
+# Docker-Netzwerk
 
-Die Datenbankdateien werden unter
+PostgreSQL ist mit dem gemeinsamen Docker-Netzwerk
 
-`/opt/atlas/data/postgres`
+```text
+atlas-network
+```
 
-gespeichert.
+verbunden.
+
+Dadurch können andere Dienste PostgreSQL über den Docker-Service-Namen
+
+```text
+postgres
+```
+
+erreichen.
+
+Eine Kommunikation über feste IP-Adressen ist innerhalb der Plattform nicht erforderlich.
+
+---
+
+# Datenhaltung
+
+Alle Daten werden persistent gespeichert.
+
+Dazu gehören insbesondere:
+
+- Datenbanken
+- Tabellen
+- Benutzer
+- Rollen
+- Indizes
+- Konfigurationen
 
 Der Container selbst bleibt zustandslos und kann jederzeit neu erstellt werden.
 
 ---
 
-### Netzwerk
+# Benutzer und Datenbanken
 
-Für die Entwicklungsphase wird PostgreSQL über Port `5432` auf dem Raspberry Pi bereitgestellt.
+## Benutzer
 
-Dadurch ist ein Zugriff mit Werkzeugen wie DBeaver oder IntelliJ möglich.
+| Benutzer | Zweck           |
+| -------- | --------------- |
+| atlas    | Administration  |
+| n8n      | Workflow Engine |
+
+---
+
+## Datenbanken
+
+| Datenbank | Besitzer |
+| --------- | -------- |
+| atlas     | atlas    |
+| n8n       | n8n      |
+
+---
+
+# Zugriff
+
+Für Entwicklungs- und Administrationszwecke wird PostgreSQL über Port
+
+```text
+5432
+```
+
+bereitgestellt.
+
+Dadurch ist ein Zugriff beispielsweise über
+
+- DBeaver
+- IntelliJ IDEA
+- psql
+
+möglich.
 
 Ein direkter Zugriff aus dem Internet ist nicht vorgesehen.
 
 ---
 
+# Architekturentscheidungen
+
+## Containerisierung
+
+PostgreSQL wird ausschließlich als Docker-Container betrieben.
+
+**Gründe**
+
+- reproduzierbare Bereitstellung
+- einfache Updates
+- saubere Trennung vom Hostsystem
+
+---
+
+## Persistente Daten
+
+Persistente Daten werden ausschließlich unter
+
+```text
+/opt/atlas/data/postgres
+```
+
+gespeichert.
+
+---
+
+## Konfiguration
+
+Sensible Konfigurationswerte werden über eine `.env`-Datei verwaltet.
+
+Dadurch kann die Compose-Datei versioniert werden, ohne Zugangsdaten zu enthalten.
+
+---
+
 ## Status
 
-✅ PostgreSQL erfolgreich eingerichtet
+✅ PostgreSQL erfolgreich integriert
+
+PostgreSQL bildet die zentrale relationale Datenbank der Atlas-Plattform und dient als gemeinsame Datenbasis für Infrastruktur-Dienste sowie zukünftige Anwendungen.

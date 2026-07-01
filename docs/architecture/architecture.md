@@ -1,10 +1,10 @@
 # Architektur
 
-Dieses Dokument beschreibt die grundlegende Architektur von Atlas.
+Dieses Dokument beschreibt die grundlegende Architektur der Atlas-Plattform.
 
-Es dient als technische Referenz für den Aufbau der Plattform und definiert die Prinzipien sowie die Struktur, nach denen Infrastruktur und Projekte organisiert werden.
+Es definiert die Prinzipien, Komponenten und Strukturen, nach denen Infrastruktur und zukünftige Projekte aufgebaut werden.
 
-Die Architektur soll langfristig Stabilität, Erweiterbarkeit und Wartbarkeit gewährleisten.
+Ziel ist eine reproduzierbare, modulare und langfristig wartbare Entwicklungsplattform.
 
 ---
 
@@ -13,55 +13,71 @@ Die Architektur soll langfristig Stabilität, Erweiterbarkeit und Wartbarkeit ge
 Atlas basiert auf folgenden Grundprinzipien:
 
 - Trennung von Infrastruktur und Projekten
-- Containerisierung aller Anwendungen
+- Containerisierung aller Dienste
 - Reproduzierbare Konfigurationen
 - Klare Verantwortlichkeiten
 - Zentrale Dokumentation
-- Erweiterbarkeit ohne Beeinflussung bestehender Dienste
+- Modulare Erweiterbarkeit
 
 ---
 
-# Systemübersicht
+# Systemarchitektur
 
 Atlas besteht aus mehreren logisch getrennten Ebenen.
 
 ```text
-                    Atlas
-                      │
-        ┌─────────────┴─────────────┐
-        │                           │
- Infrastruktur                 Projekte
-        │                           │
- Container-Plattform        Eigene Anwendungen
- Gemeinsame Dienste         APIs
- Netzwerke                  Tools
- Speicher                   Experimente
+                     Atlas
+
+                        │
+
+               Raspberry Pi 5
+
+                        │
+
+                 Docker Engine
+
+                        │
+
+                 atlas-network
+
+        ┌───────────────┴───────────────┐
+        │                               │
+   PostgreSQL                        n8n
+        │
+        ▼
+/opt/atlas/data/postgres
 ```
 
-Jede Ebene besitzt eine klar definierte Aufgabe und kann unabhängig weiterentwickelt werden.
+Die Infrastruktur-Dienste kommunizieren über ein gemeinsames Docker-Netzwerk (`atlas-network`) und können dadurch unabhängig voneinander betrieben werden.
 
 ---
 
-# Komponenten
+# Infrastruktur
 
-## Infrastruktur
+Infrastruktur-Dienste stellen gemeinsam genutzte Funktionen für mehrere Anwendungen bereit.
 
-Die Infrastruktur stellt gemeinsam genutzte Dienste bereit, die von mehreren Projekten verwendet werden können.
+Aktuelle Dienste:
 
-Beispiele:
+- PostgreSQL
+- n8n
 
-- Container-Plattform
-- Datenbanken
+Geplante Dienste:
+
+- Redis
 - Reverse Proxy
 - Monitoring
 - Backup
-- Automatisierung
 
-Diese Komponenten bilden das Fundament der Plattform.
+Jeder Infrastruktur-Dienst besitzt:
+
+- ein eigenes Compose-Projekt
+- ein eigenes Datenverzeichnis
+- eine eigene Dokumentation
+- einen klar definierten Verantwortungsbereich
 
 ---
 
-## Projekte
+# Projekte
 
 Projekte sind eigenständige Anwendungen, die auf der Infrastruktur aufbauen.
 
@@ -72,31 +88,90 @@ Jedes Projekt besitzt:
 - eine eigene Konfiguration
 - einen eigenen Lebenszyklus
 
-Projekte können unabhängig voneinander entwickelt, gestartet, aktualisiert oder entfernt werden.
+Projekte können unabhängig entwickelt, bereitgestellt und entfernt werden.
 
 ---
 
 # Verzeichnisstruktur
 
-Atlas verwendet unter `/opt/atlas` eine zentrale Verzeichnisstruktur.
+Die Infrastruktur verwendet unter `/opt/atlas` eine einheitliche Verzeichnisstruktur.
 
 ```text
 /opt/atlas
-├── backups/       # Backups und Sicherungen
-├── compose/       # Docker Compose Stacks
-├── data/          # Persistente Daten der Container
-├── logs/          # Eigene Logdateien
-├── repositories/  # Git-Repositories
-└── scripts/       # Hilfsskripte
+├── backups/
+├── compose/
+│   ├── postgres/
+│   └── n8n/
+├── data/
+│   ├── postgres/
+│   └── n8n/
+├── logs/
+├── repositories/
+└── scripts/
 ```
 
-## Grundsätze
+---
 
-- Compose-Dateien werden ausschließlich unter `compose/` abgelegt.
-- Persistente Daten werden ausschließlich unter `data/` gespeichert.
-- Git-Repositories liegen unter `repositories/`.
-- Backups werden zentral unter `backups/` verwaltet.
-- Eigene Skripte werden unter `scripts/` abgelegt.
+# Architekturstandards
+
+Für alle Infrastruktur-Dienste gelten folgende Standards:
+
+## Docker Compose
+
+Jeder Dienst besitzt ein eigenes Compose-Projekt.
+
+```text
+compose/
+└── <service>/
+    ├── compose.yaml
+    └── .env
+```
+
+---
+
+## Persistente Daten
+
+Container bleiben zustandslos.
+
+Persistente Daten werden ausschließlich unter
+
+```text
+/opt/atlas/data/<service>
+```
+
+gespeichert.
+
+---
+
+## Netzwerke
+
+Alle Infrastruktur-Dienste werden über das gemeinsame Docker-Netzwerk
+
+```text
+atlas-network
+```
+
+verbunden.
+
+Dadurch können sich Dienste über ihre Servicenamen erreichen.
+
+Beispiel:
+
+```text
+postgres
+n8n
+redis
+```
+
+IP-Adressen werden innerhalb der Plattform nicht verwendet.
+
+---
+
+## Konfiguration
+
+Konfigurationswerte werden über `.env`-Dateien verwaltet.
+
+Dadurch bleiben Compose-Dateien unabhängig von sensiblen Informationen und können problemlos versioniert werden.
 
 ---
 
@@ -104,9 +179,9 @@ Atlas verwendet unter `/opt/atlas` eine zentrale Verzeichnisstruktur.
 
 Atlas ist modular aufgebaut.
 
-Neue Projekte können unabhängig von der bestehenden Infrastruktur integriert werden.
+Neue Infrastruktur-Dienste können unabhängig ergänzt werden, ohne bestehende Komponenten anzupassen.
 
-Neue Infrastruktur-Dienste werden nur aufgenommen, wenn sie mehreren Projekten einen Mehrwert bieten oder den Betrieb der Plattform verbessern.
+Neue Projekte bauen auf der bestehenden Infrastruktur auf und folgen denselben Architekturstandards.
 
 ---
 
@@ -115,8 +190,8 @@ Neue Infrastruktur-Dienste werden nur aufgenommen, wenn sie mehreren Projekten e
 Die Architektur verfolgt folgende Ziele:
 
 - reproduzierbare Infrastruktur
+- modulare Erweiterbarkeit
 - einfache Wartbarkeit
 - klare Verantwortlichkeiten
 - saubere Dokumentation
-- langfristige Erweiterbarkeit
-- modulare Entwicklung
+- langfristige Skalierbarkeit

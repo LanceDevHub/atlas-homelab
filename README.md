@@ -4,7 +4,7 @@
 
 ## Was ist Atlas?
 
-Atlas ist mein persönliches HomeLab und dient als zentrale Entwicklungsplattform für alle zukünftigen Softwareprojekte.
+Atlas ist mein persönliches HomeLab und dient als zentrale Entwicklungsplattform für zukünftige Softwareprojekte.
 
 Anstatt für jedes neue Projekt eine separate Entwicklungsumgebung aufzusetzen, entsteht mit Atlas eine reproduzierbare Infrastruktur, auf der Anwendungen entwickelt, getestet und betrieben werden können.
 
@@ -26,7 +26,7 @@ Langfristig soll Atlas die Grundlage für sämtliche privaten und beruflichen En
 
 Atlas ist kein Raspberry Pi mit einigen installierten Diensten.
 
-Atlas ist eine persönliche Plattform, auf der neue Ideen entstehen, getestet und kontinuierlich weiterentwickelt werden.
+Atlas ist eine persönliche Plattform, auf der Infrastruktur, Automatisierung und Softwareentwicklung gemeinsam wachsen.
 
 Jedes Projekt soll auf einer sauberen, dokumentierten und reproduzierbaren Infrastruktur aufbauen.
 
@@ -38,9 +38,9 @@ Jedes Projekt soll auf einer sauberen, dokumentierten und reproduzierbaren Infra
 
 - Linux sicher administrieren
 - Docker und Docker Compose verstehen
+- Containerisierte Infrastruktur aufbauen
 - n8n kennenlernen
-- Git als zentrales Versionsverwaltungssystem etablieren
-- Eine saubere Dokumentation aufbauen
+- Eine saubere Dokumentation etablieren
 
 ### Mittelfristig
 
@@ -48,6 +48,7 @@ Jedes Projekt soll auf einer sauberen, dokumentierten und reproduzierbaren Infra
 - Fullstack-Projekte hosten
 - Automatisierungen entwickeln
 - Datenbanken professionell einsetzen
+- Reverse Proxy und Monitoring integrieren
 - CI/CD und Deployment kennenlernen
 
 ### Langfristig
@@ -71,17 +72,24 @@ Bei der Entwicklung von Atlas gelten folgende Grundsätze:
 
 ---
 
-## Projektstruktur
+## Repository-Struktur
 
 ```text
 atlas-homelab/
 │
 ├── docs/
-├── infrastructure/
+│   ├── architecture/
+│   ├── reference/
+│   ├── services/
+│   └── setup/
+│
 ├── compose/
+├── infrastructure/
 ├── projects/
 └── scripts/
 ```
+
+> Dieses Repository dokumentiert den Aufbau von Atlas. Die eigentliche Infrastruktur wird aktuell direkt auf dem Raspberry Pi aufgebaut und betrieben.
 
 ---
 
@@ -89,28 +97,53 @@ atlas-homelab/
 
 ### Version 0.2 – Basisplattform
 
-#### Abgeschlossen
+#### Infrastruktur
 
-- ✅ Raspberry Pi eingerichtet
-- ✅ SSH konfiguriert
-- ✅ SSH-Schlüssel eingerichtet
-- ✅ SSH-Härtung durchgeführt
-- ✅ Tailscale eingerichtet
-- ✅ UFW-Firewall konfiguriert
-- ✅ Git installiert und konfiguriert
-- ✅ Docker Engine installiert
-- ✅ Docker Compose Plugin installiert
-- ✅ Benutzer für Docker konfiguriert
-- ✅ Verzeichnisstruktur unter `/opt/atlas` erstellt
+✅ Raspberry Pi eingerichtet
 
-#### Nächster Meilenstein
+✅ SSH mit Public-Key-Authentifizierung
 
-**Basis der Container-Plattform**
+✅ SSH-Härtung durchgeführt
 
-Geplante Aufgaben:
+✅ Tailscale eingerichtet
 
-- Docker-Compose-Standard definieren
-- Ersten Compose-Stack erstellen
-- Struktur für Infrastruktur-Dienste aufbauen
-- Erste produktive Anwendung bereitstellen
+✅ UFW-Firewall konfiguriert
 
+✅ Docker Engine installiert
+
+✅ Docker Compose eingerichtet
+
+✅ Atlas-Verzeichnisstruktur aufgebaut
+
+✅ Gemeinsames Docker-Netzwerk eingerichtet
+
+#### Dienste
+
+✅ PostgreSQL als Docker-Container integriert
+
+✅ n8n mit PostgreSQL verbunden
+
+#### Dokumentation
+
+✅ Architektur dokumentiert
+
+✅ Setup dokumentiert
+
+✅ Docker- und PostgreSQL-Referenzen erstellt
+
+---
+
+## Nächster Meilenstein
+
+### Infrastruktur erweitern
+
+- Reverse Proxy (Traefik oder Caddy)
+- Redis integrieren
+- Backup-Strategie entwickeln
+- Monitoring aufbauen
+
+### Dokumentation erweitern
+
+- n8n-Dokumentation ergänzen
+- Infrastruktur-Dokumentation aktualisieren
+- Weitere Referenzen erstellen
