@@ -87,21 +87,30 @@ atlas-homelab/
 
 ## Aktueller Entwicklungsstand
 
-### Version 0.1
+### Version 0.2 – Basisplattform
 
-Abgeschlossen:
+#### Abgeschlossen
 
-- Raspberry Pi eingerichtet
-- SSH konfiguriert
-- Tailscale eingerichtet
-- Firewall konfiguriert
-- SSH-Härtung durchgeführt
+- ✅ Raspberry Pi eingerichtet
+- ✅ SSH konfiguriert
+- ✅ SSH-Schlüssel eingerichtet
+- ✅ SSH-Härtung durchgeführt
+- ✅ Tailscale eingerichtet
+- ✅ UFW-Firewall konfiguriert
+- ✅ Git installiert und konfiguriert
+- ✅ Docker Engine installiert
+- ✅ Docker Compose Plugin installiert
+- ✅ Benutzer für Docker konfiguriert
+- ✅ Verzeichnisstruktur unter `/opt/atlas` erstellt
 
-Als Nächstes:
+#### Nächster Meilenstein
 
-- Git installieren und konfigurieren
-- Docker Engine installieren
-- Docker Compose einrichten
-- Serverstruktur definieren
-- Ersten Container bereitstellen
+**Basis der Container-Plattform**
+
+Geplante Aufgaben:
+
+- Docker-Compose-Standard definieren
+- Ersten Compose-Stack erstellen
+- Struktur für Infrastruktur-Dienste aufbauen
+- Erste produktive Anwendung bereitstellen
 
