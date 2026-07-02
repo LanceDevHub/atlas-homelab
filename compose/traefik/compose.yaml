@@ -1,0 +1,44 @@
+services:
+  traefik:
+    image: traefik:3.7.5
+
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=atlas-network"
+
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+
+
+      - "--api=true"
+      - "--api.dashboard=true"
+
+      - "--log.level=INFO"
+
+    ports:
+      - "80:80"
+      - "443:443"
+
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+    labels:
+      - "traefik.enable=true"
+
+      - "traefik.http.routers.traefik.rule=Host(`${TRAEFIK_HOST}`)"
+      - "traefik.http.routers.traefik.entrypoints=web"
+
+      - "traefik.http.routers.traefik.service=api@internal"
+
+    networks:
+      - atlas-network
+
+networks:
+  atlas-network:
+    external: true

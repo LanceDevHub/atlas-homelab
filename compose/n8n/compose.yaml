@@ -1,0 +1,31 @@
+services:
+  n8n:
+    image: n8nio/n8n:2.28.4
+
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    volumes:
+      - /opt/atlas/data/n8n:/home/node/.n8n
+
+    labels:
+      - "traefik.enable=true"
+
+      - "traefik.http.routers.n8n.rule=Host(`${N8N_HOST}`)"
+
+      - "traefik.http.routers.n8n.entrypoints=web"
+
+      - "traefik.http.services.n8n.loadbalancer.server.port=5678"
+
+      - "traefik.docker.network=atlas-network"
+
+    networks:
+      - atlas-network
+
+
+networks:
+  atlas-network:
+    external: true
+
