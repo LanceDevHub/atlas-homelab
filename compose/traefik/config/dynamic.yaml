@@ -1,0 +1,4 @@
+tls:
+  certificates:
+    - certFile: /certs/atlas.crt
+      keyFile: /certs/atlas.key

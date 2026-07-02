@@ -20,6 +20,9 @@ services:
 
       - "--log.level=INFO"
 
+      - "--providers.file.directory=/config"
+      - "--providers.file.watch=true"
+
     ports:
       - "80:80"
       - "443:443"
@@ -27,11 +30,16 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
+      - /opt/atlas/certs:/certs:ro
+
+      - /opt/atlas/compose/traefik/config:/config:ro
+
     labels:
       - "traefik.enable=true"
 
       - "traefik.http.routers.traefik.rule=Host(`${TRAEFIK_HOST}`)"
-      - "traefik.http.routers.traefik.entrypoints=web"
+      - "traefik.http.routers.traefik.entrypoints=websecure"
+      - "traefik.http.routers.traefik.tls=true"
 
       - "traefik.http.routers.traefik.service=api@internal"
 
