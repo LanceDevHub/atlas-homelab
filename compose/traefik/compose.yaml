@@ -15,7 +15,6 @@ services:
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
 
-
       - "--api=true"
       - "--api.dashboard=true"
 
