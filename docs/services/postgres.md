@@ -134,6 +134,8 @@ Dadurch ist ein Zugriff beispielsweise über
 
 möglich.
 
+Produktive Anwendungen greifen ausschließlich über das gemeinsame Docker-Netzwerk auf PostgreSQL zu.
+
 Ein direkter Zugriff aus dem Internet ist nicht vorgesehen.
 
 ---
@@ -164,6 +166,17 @@ gespeichert.
 
 ---
 
+## Datenbankstruktur
+
+Jede Anwendung erhält:
+
+- einen eigenen PostgreSQL-Benutzer
+- eine eigene Datenbank
+
+Dadurch bleiben Anwendungen logisch voneinander getrennt und Berechtigungen können gezielt vergeben werden.
+
+---
+
 ## Konfiguration
 
 Sensible Konfigurationswerte werden über eine `.env`-Datei verwaltet.
@@ -172,8 +185,12 @@ Dadurch kann die Compose-Datei versioniert werden, ohne Zugangsdaten zu enthalte
 
 ---
 
-## Status
+# Status
 
 ✅ PostgreSQL erfolgreich integriert
 
-PostgreSQL bildet die zentrale relationale Datenbank der Atlas-Plattform und dient als gemeinsame Datenbasis für Infrastruktur-Dienste sowie zukünftige Anwendungen.
+✅ Zentrale Datenbank der Atlas-Plattform
+
+✅ Docker-Netzwerk integriert
+
+✅ Separate Benutzer- und Datenbankstruktur etabliert

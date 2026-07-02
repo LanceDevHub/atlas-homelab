@@ -40,6 +40,8 @@ Atlas besteht aus mehreren logisch getrennten Ebenen.
 
                  atlas-network
 
+                     Traefik
+                        │
         ┌───────────────┴───────────────┐
         │                               │
    PostgreSQL                        n8n
@@ -50,6 +52,8 @@ Atlas besteht aus mehreren logisch getrennten Ebenen.
 
 Die Infrastruktur-Dienste kommunizieren über ein gemeinsames Docker-Netzwerk (`atlas-network`) und können dadurch unabhängig voneinander betrieben werden.
 
+Traefik bildet den zentralen Einstiegspunkt für alle Webanwendungen innerhalb der Plattform.
+
 ---
 
 # Infrastruktur
@@ -58,13 +62,13 @@ Infrastruktur-Dienste stellen gemeinsam genutzte Funktionen für mehrere Anwendu
 
 Aktuelle Dienste:
 
+- Traefik
 - PostgreSQL
 - n8n
 
 Geplante Dienste:
 
 - Redis
-- Reverse Proxy
 - Monitoring
 - Backup
 
@@ -101,6 +105,7 @@ Die Infrastruktur verwendet unter `/opt/atlas` eine einheitliche Verzeichnisstru
 ├── backups/
 ├── compose/
 │   ├── postgres/
+│   ├── traefik/
 │   └── n8n/
 ├── data/
 │   ├── postgres/
@@ -114,7 +119,7 @@ Die Infrastruktur verwendet unter `/opt/atlas` eine einheitliche Verzeichnisstru
 
 # Architekturstandards
 
-Für alle Infrastruktur-Dienste gelten folgende Standards:
+Für alle Infrastruktur-Dienste gelten folgende Standards.
 
 ## Docker Compose
 
@@ -153,17 +158,30 @@ atlas-network
 
 verbunden.
 
-Dadurch können sich Dienste über ihre Servicenamen erreichen.
+Dadurch können sich Dienste über ihre Docker-Service-Namen erreichen.
 
 Beispiel:
 
 ```text
 postgres
 n8n
+traefik
 redis
 ```
 
 IP-Adressen werden innerhalb der Plattform nicht verwendet.
+
+---
+
+## Reverse Proxy
+
+Traefik ist der zentrale Reverse Proxy der Atlas-Plattform.
+
+Alle Webanwendungen werden ausschließlich über Traefik veröffentlicht.
+
+Nur Traefik veröffentlicht Ports auf dem Hostsystem.
+
+Alle übrigen Dienste kommunizieren ausschließlich über das gemeinsame Docker-Netzwerk und veröffentlichen keine eigenen HTTP- oder HTTPS-Ports.
 
 ---
 

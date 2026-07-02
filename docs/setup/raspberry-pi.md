@@ -40,6 +40,8 @@ Diese Dokumentation beschreibt alle Schritte, die zur Einrichtung des Hostsystem
 ## Infrastruktur
 
 - Atlas-Verzeichnisstruktur erstellt
+- Docker-Netzwerk `atlas-network` eingerichtet
+- Traefik integriert
 - PostgreSQL integriert
 - n8n integriert
 
@@ -184,8 +186,12 @@ Nach Abschluss des Raspberry-Pi-Setups läuft folgende Infrastruktur auf dem Hos
 
 - Docker Engine
 - Docker Compose
+- Docker-Netzwerk `atlas-network`
+- Traefik
 - PostgreSQL
 - n8n
+
+Die gesamte Infrastruktur wird containerisiert betrieben und kommuniziert über das gemeinsame Docker-Netzwerk.
 
 ---
 
@@ -195,8 +201,8 @@ Die Grundinstallation des Hostsystems ist abgeschlossen.
 
 Die weitere Entwicklung konzentriert sich auf den Ausbau der Atlas-Infrastruktur, beispielsweise durch:
 
-- Reverse Proxy
 - Redis
 - Monitoring
 - Backup-Strategie
 - Weitere Infrastruktur-Dienste
+- Überführung der Infrastruktur in ein versioniertes Git-Repository (Infrastructure as Code)

@@ -73,10 +73,6 @@ Aktuell nutzt n8n folgende Dienste:
 | ---------- | -------- |
 | PostgreSQL | postgres |
 
-Die Verbindung zu PostgreSQL erfolgt ausschließlich über den Docker-Service-Namen `postgres`.
-
-Innerhalb der Atlas-Plattform werden keine festen IP-Adressen verwendet.
-
 ---
 
 # Datenhaltung
@@ -124,7 +120,7 @@ http://n8n.home.arpa
 
 erreichbar.
 
-Traefik leitet eingehende HTTP-Anfragen automatisch über das gemeinsame Docker-Netzwerk an den n8n-Container weiter.
+Traefik leitet eingehende Anfragen automatisch über das gemeinsame Docker-Netzwerk an den n8n-Container weiter.
 
 ---
 
