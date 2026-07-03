@@ -2,11 +2,11 @@
 
 Dieses Dokument definiert den Standard, nach dem neue Dienste in Atlas integriert werden.
 
-Alle Infrastruktur-Dienste folgen demselben Aufbau und derselben Vorgehensweise.
+Alle containerisierten Infrastruktur-Dienste folgen demselben Aufbau und derselben Vorgehensweise.
 
 ---
 
-## Ziel
+# Ziel
 
 Jeder Dienst soll:
 
@@ -14,11 +14,11 @@ Jeder Dienst soll:
 - reproduzierbar sein
 - einfach aktualisiert werden können
 - klar dokumentiert sein
-- sich in die bestehende Plattform integrieren
+- sich nahtlos in die bestehende Plattform integrieren
 
 ---
 
-## Verzeichnisstruktur
+# Verzeichnisstruktur
 
 Jeder Dienst besitzt eine eigene Struktur innerhalb von `/opt/atlas`.
 
@@ -32,11 +32,15 @@ data/
 └── <service>/
 ```
 
+Compose-Dateien enthalten ausschließlich die Definition des Dienstes.
+
+Persistente Daten werden außerhalb der Container gespeichert.
+
 ---
 
-## Standard-Workflow
+# Standard-Workflow
 
-Jeder neue Dienst wird nach folgendem Ablauf integriert:
+Jeder neue Dienst wird nach folgendem Ablauf integriert.
 
 1. Dienst auswählen
 2. Service-Verzeichnis erstellen
@@ -50,10 +54,35 @@ Jeder neue Dienst wird nach folgendem Ablauf integriert:
 
 ---
 
-## Grundsätze
+# Grundsätze
 
-- Jeder Dienst besitzt genau einen Zweck.
+- Jeder Dienst besitzt genau eine klar definierte Verantwortung.
 - Persistente Daten liegen ausschließlich unter `/opt/atlas/data`.
 - Compose-Dateien liegen ausschließlich unter `/opt/atlas/compose`.
 - Konfigurationswerte werden über `.env` verwaltet.
-- Jeder Dienst wird dokumentiert.
+- Jeder Dienst wird vollständig dokumentiert.
+- Jeder Dienst besitzt ein eigenes Compose-Projekt.
+- Dienste kommunizieren ausschließlich über `atlas-network`.
+- Vertrauliche Konfigurationswerte werden nicht versioniert.
+
+---
+
+# Geltungsbereich
+
+Dieser Standard gilt ausschließlich für containerisierte Infrastruktur-Dienste.
+
+Beispiele:
+
+- Traefik
+- PostgreSQL
+- n8n
+
+Nicht Bestandteil dieses Standards sind Infrastruktur-Komponenten wie:
+
+- Backup Engine
+- Restore Engine
+- Transfer Engine
+- systemd-Services und -Timer
+- Event-System
+
+Diese Komponenten besitzen eigene Architektur- und Betriebsdokumentationen.

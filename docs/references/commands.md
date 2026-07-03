@@ -2,7 +2,7 @@
 
 Dieses Dokument enthält häufig verwendete Befehle für die Verwaltung der Atlas-Plattform.
 
-Es dient als schnelles Nachschlagewerk für Betrieb, Backup, Restore und PostgreSQL.
+Es dient als schnelles Nachschlagewerk für Betrieb, Backup, Restore, systemd und PostgreSQL.
 
 ---
 
@@ -15,6 +15,16 @@ Es dient als schnelles Nachschlagewerk für Betrieb, Backup, Restore und Postgre
 ```
 
 Erstellt ein vollständiges Atlas-Backup.
+
+---
+
+## Backup übertragen
+
+```bash
+sudo ./scripts/backup-transfer.sh
+```
+
+Überträgt lokale Backups auf das externe Backup-Ziel.
 
 ---
 
@@ -33,7 +43,15 @@ Beispiel:
 
 ---
 
-# Scheduled Backups
+# systemd
+
+## systemd neu laden
+
+```bash
+sudo systemctl daemon-reload
+```
+
+---
 
 ## Backup-Service starten
 
@@ -75,6 +93,46 @@ sudo systemctl status atlas-backup.timer
 
 ---
 
+## Backup-Transfer-Service starten
+
+```bash
+sudo systemctl start atlas-backup-transfer.service
+```
+
+---
+
+## Backup-Transfer-Service Status
+
+```bash
+sudo systemctl status atlas-backup-transfer.service
+```
+
+---
+
+## Backup-Transfer-Timer starten
+
+```bash
+sudo systemctl start atlas-backup-transfer.timer
+```
+
+---
+
+## Backup-Transfer-Timer aktivieren
+
+```bash
+sudo systemctl enable atlas-backup-transfer.timer
+```
+
+---
+
+## Backup-Transfer-Timer Status
+
+```bash
+sudo systemctl status atlas-backup-transfer.timer
+```
+
+---
+
 ## Alle Timer anzeigen
 
 ```bash
@@ -93,6 +151,20 @@ Live:
 
 ```bash
 journalctl -fu atlas-backup.service
+```
+
+---
+
+## Backup-Transfer-Logs anzeigen
+
+```bash
+journalctl -u atlas-backup-transfer.service
+```
+
+Live:
+
+```bash
+journalctl -fu atlas-backup-transfer.service
 ```
 
 ---
@@ -281,6 +353,32 @@ pg_restore \
 -U "${POSTGRES_USER}" \
 -d <database> \
 backup.dump
+```
+
+---
+
+# SMB
+
+## Backup-Ziel
+
+```text
+/mnt/atlas-backups
+```
+
+---
+
+## Backup-Ziel prüfen
+
+```bash
+mount | grep atlas-backups
+```
+
+---
+
+## Alle Dateisysteme erneut einbinden
+
+```bash
+sudo mount -a
 ```
 
 ---

@@ -1,0 +1,12 @@
+[Unit]
+Description=Atlas Backup Transfer
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/atlas/scripts
+ExecStart=/opt/atlas/scripts/backup-transfer.sh
+
+[Install]
+WantedBy=multi-user.target

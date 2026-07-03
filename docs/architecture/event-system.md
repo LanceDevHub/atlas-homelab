@@ -60,23 +60,23 @@ Die Backup Engine kennt weder Discord noch andere Benachrichtigungssysteme.
 Das Event-System besteht aus drei Ebenen.
 
 ```text
-                Infrastruktur
+                    Infrastruktur
 
-        ┌────────┬────────┬────────┐
-        │        │        │        │
-   Backup   Restore   Monitoring  Deployments
-        │        │        │        │
-        └────────┴────────┴────────┘
-                     │
-                     ▼
-                 Event-System
-                     │
-                     ▼
-                    n8n
-        ┌────────────┼────────────┐
-        │            │            │
-        ▼            ▼            ▼
-     Discord      E-Mail     Weitere Workflows
+      ┌────────┬─────────┬──────────┬────────────┐
+      │        │         │          │            │
+ Backup  Restore  Transfer  Monitoring  Deployments
+      │        │         │          │            │
+      └────────┴─────────┴──────────┴────────────┘
+                       │
+                       ▼
+                  Event-System
+                       │
+                       ▼
+                      n8n
+         ┌─────────────┼─────────────┐
+         │             │             │
+         ▼             ▼             ▼
+      Discord       E-Mail     Weitere Workflows
 ```
 
 Alle Infrastruktur-Komponenten kommunizieren ausschließlich mit dem Event-System.
@@ -95,6 +95,7 @@ Beispiele:
 
 - Backup abgeschlossen
 - Restore abgeschlossen
+- Backup übertragen
 - Backup fehlgeschlagen
 - Monitoring-Warnung
 - Deployment abgeschlossen
@@ -162,18 +163,38 @@ Discord
 
 ---
 
+## Erfolgreiche Backup-Übertragung
+
+```text
+backup-transfer.sh
+
+↓
+
+Backup übertragen
+
+↓
+
+Event
+
+↓
+
+n8n
+
+↓
+
+Discord
+```
+
+---
+
 ## Backup-Ziel nicht erreichbar
 
 ```text
-backup.sh
+backup-transfer.sh
 
 ↓
 
-Backup lokal erstellt
-
-↓
-
-Gaming-PC offline
+Backup-Ziel nicht erreichbar
 
 ↓
 
@@ -189,7 +210,7 @@ Discord
 
 ↓
 
-Backup später erneut übertragen
+Erneuter Übertragungsversuch
 ```
 
 ---
@@ -201,7 +222,7 @@ backup.sh
 
 ↓
 
-PostgreSQL Backup fehlgeschlagen
+PostgreSQL-Backup fehlgeschlagen
 
 ↓
 
@@ -331,7 +352,6 @@ Das Event-System bildet die Grundlage für zukünftige Automatisierungen.
 
 Geplante Erweiterungen:
 
-- Backup-Übertragung
 - Backup-Rotation
 - Monitoring
 - Software-Updates

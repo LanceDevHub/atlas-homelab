@@ -1,19 +1,20 @@
 # Scheduled Backups
 
-Dieses Dokument beschreibt die automatische Ausführung von Backups innerhalb der Atlas-Plattform.
+Dieses Dokument beschreibt die automatische Ausführung der Backup-Komponenten innerhalb der Atlas-Plattform.
 
-Geplante Backups werden über einen systemd-Timer gestartet und führen das Backup-Skript in einem festen Zeitintervall aus.
+Geplante Backups und Backup-Übertragungen werden über systemd-Timer gestartet und führen die jeweiligen Skripte in festgelegten Zeitintervallen aus.
 
 ---
 
 # Ziel
 
-Die automatische Ausführung stellt sicher, dass regelmäßig aktuelle Backups erstellt werden, ohne dass ein manueller Eingriff erforderlich ist.
+Die automatische Ausführung stellt sicher, dass regelmäßig aktuelle Backups erstellt und auf externe Systeme übertragen werden, ohne dass ein manueller Eingriff erforderlich ist.
 
 Dadurch werden folgende Ziele erreicht:
 
 - regelmäßige Datensicherung
-- reproduzierbare Backup-Intervalle
+- automatische Backup-Übertragung
+- reproduzierbare Ausführungsintervalle
 - automatische Ausführung nach einem Neustart
 - Integration in das Linux-Service-Management
 
@@ -21,52 +22,42 @@ Dadurch werden folgende Ziele erreicht:
 
 # Architektur
 
-Atlas verwendet systemd zur Planung geplanter Backups.
+Atlas verwendet systemd zur Planung geplanter Aufgaben.
 
 ```text
-systemd Timer
-        │
-        ▼
-atlas-backup.service
-        │
-        ▼
-scripts/backup.sh
-        │
-        ▼
-Backup erstellen
-        │
-        ▼
-Backup verifizieren
-        │
-        ▼
-Backup-Rotation
+                 systemd
+
+        ┌──────────────┴──────────────┐
+        │                             │
+        ▼                             ▼
+atlas-backup.timer      atlas-backup-transfer.timer
+        │                             │
+        ▼                             ▼
+atlas-backup.service   atlas-backup-transfer.service
+        │                             │
+        ▼                             ▼
+ scripts/backup.sh    scripts/backup-transfer.sh
 ```
 
-Der Timer startet ausschließlich den Backup-Service.
+Die Timer starten ausschließlich die jeweiligen Services.
 
-Die eigentliche Backup-Logik befindet sich vollständig im Skript
+Die eigentliche Logik befindet sich vollständig in den Skripten.
 
-```text
-scripts/backup.sh
-```
-
-Dadurch bleiben Planung und Backup-Implementierung voneinander getrennt.
+Dadurch bleiben Planung und Implementierung konsequent voneinander getrennt.
 
 ---
 
 # Komponenten
 
-Die automatische Sicherung besteht aus zwei systemd-Einheiten.
-
-## Service
+## Backup Service
 
 ```text
 systemd/atlas-backup.service
 ```
 
-Der Service startet das Backup-Skript genau einmal.
+Startet die Backup Engine einmalig.
 
-Er besitzt den Typ
+Der Service besitzt den Typ
 
 ```text
 oneshot
@@ -76,34 +67,63 @@ und beendet sich nach erfolgreicher Ausführung automatisch.
 
 ---
 
-## Timer
+## Backup Timer
 
 ```text
 systemd/atlas-backup.timer
 ```
 
-Der Timer definiert den Ausführungszeitpunkt des Backup-Services.
+Startet die Backup Engine täglich um 03:00 Uhr.
 
-Aktuell wird täglich ein Backup erstellt.
+---
+
+## Backup Transfer Service
+
+```text
+systemd/atlas-backup-transfer.service
+```
+
+Startet die Transfer Engine einmalig.
+
+---
+
+## Backup Transfer Timer
+
+```text
+systemd/atlas-backup-transfer.timer
+```
+
+Startet die Transfer Engine alle 30 Minuten.
+
+Dadurch werden Backups automatisch übertragen, sobald das externe Backup-Ziel erreichbar ist.
 
 ---
 
 # Installation
 
-Die systemd-Dateien werden nach
+Die systemd-Dateien verbleiben im Atlas-Repository.
 
 ```text
-/etc/systemd/system/
+/opt/atlas/systemd
 ```
 
-kopiert.
+Für systemd werden symbolische Links erstellt.
 
 ```bash
-sudo cp systemd/atlas-backup.service /etc/systemd/system/
-sudo cp systemd/atlas-backup.timer /etc/systemd/system/
+sudo ln -s /opt/atlas/systemd/atlas-backup.service \
+    /etc/systemd/system/atlas-backup.service
+
+sudo ln -s /opt/atlas/systemd/atlas-backup.timer \
+    /etc/systemd/system/atlas-backup.timer
+
+sudo ln -s /opt/atlas/systemd/atlas-backup-transfer.service \
+    /etc/systemd/system/atlas-backup-transfer.service
+
+sudo ln -s /opt/atlas/systemd/atlas-backup-transfer.timer \
+    /etc/systemd/system/atlas-backup-transfer.timer
 ```
 
-Danach wird systemd neu geladen.
+Anschließend wird systemd neu geladen.
 
 ```bash
 sudo systemctl daemon-reload
@@ -113,71 +133,76 @@ sudo systemctl daemon-reload
 
 # Aktivierung
 
-Der Timer wird dauerhaft aktiviert.
+Die Timer werden dauerhaft aktiviert.
 
 ```bash
-sudo systemctl enable atlas-backup.timer
-```
-
-Anschließend wird er gestartet.
-
-```bash
-sudo systemctl start atlas-backup.timer
+sudo systemctl enable --now atlas-backup.timer
+sudo systemctl enable --now atlas-backup-transfer.timer
 ```
 
 ---
 
 # Konfiguration
 
-Der Ausführungszeitpunkt wird im Timer definiert.
-
-Beispiel:
+## Backup Timer
 
 ```ini
 OnCalendar=*-*-* 03:00:00
 ```
 
-Dies startet täglich um
+Erstellt täglich um
 
 ```text
 03:00 Uhr
 ```
 
-ein Backup.
+ein lokales Backup.
 
 ---
 
-# Nachholen verpasster Backups
+## Backup Transfer Timer
 
-Der Timer verwendet
+```ini
+OnCalendar=*:0/30
+```
+
+Prüft alle 30 Minuten, ob neue Backups auf das externe Backup-Ziel übertragen werden können.
+
+---
+
+# Nachholen verpasster Ausführungen
+
+Beide Timer verwenden
 
 ```ini
 Persistent=true
 ```
 
-War das System zum geplanten Zeitpunkt ausgeschaltet, wird das Backup unmittelbar nach dem nächsten Systemstart automatisch nachgeholt.
+War das System zum geplanten Zeitpunkt ausgeschaltet, wird die jeweilige Aufgabe nach dem nächsten Systemstart automatisch nachgeholt.
 
 ---
 
 # Manuelles Ausführen
 
-Der Backup-Service kann jederzeit manuell gestartet werden.
+## Backup
 
 ```bash
 sudo systemctl start atlas-backup.service
 ```
 
-Dies entspricht einer regulären Ausführung von
+---
+
+## Backup Transfer
 
 ```bash
-./scripts/backup.sh
+sudo systemctl start atlas-backup-transfer.service
 ```
 
 ---
 
 # Status prüfen
 
-## Timer
+## Backup Timer
 
 ```bash
 systemctl status atlas-backup.timer
@@ -185,10 +210,10 @@ systemctl status atlas-backup.timer
 
 ---
 
-## Service
+## Backup Transfer Timer
 
 ```bash
-systemctl status atlas-backup.service
+systemctl status atlas-backup-transfer.timer
 ```
 
 ---
@@ -203,48 +228,52 @@ systemctl list-timers
 
 # Protokolle
 
-Die Ausgabe des Backup-Skripts wird automatisch von systemd protokolliert.
+Die Ausgabe der Skripte wird automatisch von systemd protokolliert.
 
-Logs können über
+## Backup
 
 ```bash
 journalctl -u atlas-backup.service
 ```
 
-eingesehen werden.
+---
 
-Die letzte Ausführung:
-
-```bash
-journalctl -u atlas-backup.service -n 50
-```
-
-Live-Ausgabe:
+## Backup Transfer
 
 ```bash
-journalctl -fu atlas-backup.service
+journalctl -u atlas-backup-transfer.service
 ```
 
 ---
 
 # Fehlerbehandlung
 
-Schlägt das Backup fehl, beendet sich der Service mit einem Fehlerstatus.
+Schlägt eine geplante Aufgabe fehl, beendet sich der entsprechende Service mit einem Fehlerstatus.
 
-Der Timer selbst bleibt aktiv und startet das nächste geplante Backup automatisch.
+Der zugehörige Timer bleibt aktiv und startet die nächste geplante Ausführung automatisch.
+
+---
+
+# Architekturentscheidungen
+
+Atlas trifft folgende Architekturentscheidungen.
+
+- Planung und Implementierung sind getrennt.
+- systemd-Dateien verbleiben im Git-Repository.
+- systemd verwendet symbolische Links auf die Repository-Dateien.
+- Backup- und Transfer-Engine werden unabhängig voneinander geplant.
+- Lokale Backups besitzen höhere Priorität als die externe Übertragung.
 
 ---
 
 # Erweiterbarkeit
 
-Die Backup-Planung ist unabhängig von der Backup-Engine.
+Die Planung der Infrastruktur ist modular aufgebaut.
 
-Dadurch können zukünftig weitere Funktionen ergänzt werden, beispielsweise:
+Zukünftig können weitere Services und Timer ergänzt werden, beispielsweise:
 
-- mehrere Backup-Zeitpläne
-- wöchentliche Backups
-- monatliche Backups
-- Offsite-Übertragung
-- Benachrichtigungen über das Event-System
-
-Die bestehende Backup-Logik muss hierfür nicht angepasst werden.
+- Monitoring
+- Health Checks
+- Backup-Rotation
+- Software-Updates
+- Event-System

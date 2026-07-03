@@ -4,7 +4,7 @@ Dieses Dokument beschreibt die Backup-Architektur der Atlas-Plattform.
 
 Ziel ist es, nach einem vollständigen Ausfall (z. B. Defekt der SD-Karte) den ursprünglichen Zustand der Plattform reproduzierbar wiederherstellen zu können.
 
-Die Backup-Strategie definiert, welche Daten gesichert werden, wohin Backups übertragen werden und wie ein vollständiger Restore erfolgt.
+Die Backup-Strategie definiert, welche Daten gesichert werden, wie Backups gespeichert und übertragen werden sowie wie ein vollständiger Restore erfolgt.
 
 Die technische Umsetzung wird in separaten Dokumentationen beschrieben.
 
@@ -166,7 +166,7 @@ Diese Daten besitzen keinen langfristigen Wert.
 
 # Backup-Architektur
 
-Atlas trennt das Erstellen eines Backups von dessen langfristiger Speicherung.
+Atlas trennt die Erstellung eines Backups von dessen langfristiger Speicherung.
 
 ## Backup Engine
 
@@ -182,11 +182,13 @@ Sie erstellt:
 
 Die Backup Engine kennt keine externen Speicherziele.
 
+Die Übertragung auf externe Backup-Ziele erfolgt ausschließlich durch die Transfer Engine.
+
 ---
 
-## Backup Destination
+## Transfer Engine
 
-Backup-Ziele dienen ausschließlich der langfristigen Speicherung.
+Die Transfer Engine übernimmt ausschließlich die Übertragung bereits vorhandener Backups auf externe Backup-Ziele.
 
 Mögliche Ziele:
 
@@ -196,7 +198,7 @@ Mögliche Ziele:
 - NAS
 - Cloud-Speicher
 
-Dadurch bleibt die Backup Engine unabhängig von der späteren Speicherung.
+Dadurch bleiben Backup-Erstellung und Backup-Übertragung vollständig voneinander getrennt.
 
 ---
 
@@ -218,7 +220,7 @@ Diese dienen der kurzfristigen Wiederherstellung und als Ausgangspunkt für die 
 
 ## Externes Backup
 
-Anschließend werden Backups auf ein externes System übertragen.
+Anschließend werden Backups durch die Transfer Engine auf ein externes System übertragen.
 
 Beispiele:
 
@@ -279,18 +281,18 @@ Das Backup ergänzt ausschließlich die Laufzeitdaten.
 
 # Automatisierung
 
-Backups werden automatisch über einen systemd-Timer erstellt.
+Die Backup-Komponenten werden automatisch über systemd-Timer ausgeführt.
 
 Aktuell umfasst die Automatisierung:
 
 - tägliche Backups
 - Backup-Verifikation
 - Backup-Rotation
+- automatische Backup-Übertragung
 - Restore-Unterstützung
 
 Geplante Erweiterungen:
 
-- Offsite-Übertragung
 - Benachrichtigungen
 - wöchentliche Backups
 - monatliche Backups
@@ -323,8 +325,9 @@ Atlas trifft folgende grundlegende Architekturentscheidungen.
 - Das Git-Repository ist die Quelle der Infrastruktur.
 - Backups sind die Quelle der Laufzeitdaten.
 - Backups werden zunächst lokal erstellt.
+- Lokale Backups besitzen höhere Priorität als die externe Übertragung.
+- Backup-Erstellung und Backup-Übertragung sind voneinander getrennt.
 - Langfristige Speicherung erfolgt auf externen Systemen.
-- Backup-Erstellung und Backup-Speicherung sind voneinander entkoppelt.
 - Wiederkehrende Backups werden automatisch über systemd ausgeführt.
 - Benachrichtigungen werden ausschließlich über das Event-System verarbeitet.
 
@@ -346,16 +349,20 @@ Atlas trifft folgende grundlegende Architekturentscheidungen.
 
 ✅ Restore Engine implementiert
 
+✅ Transfer Engine implementiert
+
 ✅ Backup-Rotation implementiert
 
 ✅ Geplante Backups über systemd
 
-✅ Vollständigen Restore getestet
+✅ Automatische Backup-Übertragung
 
-⬜ Backup-Übertragung implementieren
+✅ Vollständigen Restore getestet
 
 ⬜ Event-System integrieren
 
 ⬜ Benachrichtigungen implementieren
+
+⬜ Weitere Backup-Ziele integrieren
 
 ⬜ Wöchentliche und monatliche Backups

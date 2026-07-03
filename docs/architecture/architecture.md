@@ -39,8 +39,9 @@ Jede Komponente besitzt genau eine klar definierte Aufgabe und kennt keine inter
 | n8n | Workflow- und Automatisierungsplattform |
 | Backup Engine | Erstellung und Verifikation von Backups |
 | Restore Engine | Wiederherstellung von Backups |
+| Transfer Engine | Übertragung lokaler Backups auf externe Backup-Ziele |
 | Event System | Bereitstellung von Ereignissen für Automatisierungen |
-| systemd Timer | Automatische Ausführung geplanter Backups |
+| systemd | Automatische Ausführung geplanter Systemaufgaben |
 
 Dadurch bleiben Komponenten unabhängig voneinander austauschbar und können getrennt weiterentwickelt werden.
 
@@ -73,32 +74,33 @@ Atlas besteht aus mehreren logisch getrennten Ebenen.
    PostgreSQL                      n8n
 ```
 
-Alle Infrastruktur-Dienste kommunizieren ausschließlich über das gemeinsame Docker-Netzwerk `atlas-network`.
+Alle containerisierten Infrastruktur-Dienste kommunizieren ausschließlich über das gemeinsame Docker-Netzwerk `atlas-network`.
 
 Traefik bildet den zentralen Einstiegspunkt für sämtliche Webanwendungen der Plattform.
 
-Zeitgesteuerte Aufgaben wie Backups werden unabhängig von den Containern über systemd ausgeführt.
+Zeitgesteuerte Aufgaben wie Backups, Backup-Übertragungen oder zukünftige Monitoring-Aufgaben werden unabhängig von den Containern über systemd ausgeführt.
 
 ---
 
 # Infrastruktur
 
-Die Infrastruktur stellt gemeinsam genutzte Dienste für sämtliche Projekte bereit.
+Die Infrastruktur stellt gemeinsam genutzte Dienste und Plattformkomponenten für sämtliche Projekte bereit.
 
-Aktuelle Infrastruktur-Dienste:
+## Containerisierte Dienste
 
 - Traefik
 - PostgreSQL
 - n8n
 
-Weitere Infrastruktur-Komponenten:
+## Plattform-Komponenten
 
 - Backup Engine
 - Restore Engine
+- Transfer Engine
 - Event System
-- Scheduled Backups (systemd)
+- systemd-Automatisierung
 
-Geplante Infrastruktur-Dienste:
+## Geplante Komponenten
 
 - Redis
 - Monitoring
@@ -109,7 +111,7 @@ Jede Infrastruktur-Komponente besitzt:
 - eine eigene Dokumentation
 - eine reproduzierbare Konfiguration
 
-Containerbasierte Dienste besitzen zusätzlich:
+Containerisierte Dienste besitzen zusätzlich:
 
 - ein eigenes Compose-Projekt
 - ein eigenes Datenverzeichnis
@@ -186,7 +188,7 @@ Persistente Daten werden ausschließlich außerhalb der Container gespeichert.
 
 ## Netzwerk
 
-Alle Dienste kommunizieren ausschließlich über das gemeinsame Docker-Netzwerk.
+Alle containerisierten Dienste kommunizieren ausschließlich über das gemeinsame Docker-Netzwerk.
 
 ```text
 atlas-network
@@ -218,7 +220,7 @@ Dadurch bleiben Compose-Dateien unabhängig von vertraulichen Informationen und 
 
 ## Automatisierung
 
-Wiederkehrende Systemaufgaben werden über systemd Services und Timer ausgeführt.
+Wiederkehrende Infrastruktur-Aufgaben werden über systemd Services und Timer ausgeführt.
 
 Die eigentliche Logik verbleibt in den entsprechenden Skripten.
 
@@ -244,7 +246,7 @@ Weitere Architekturdokumente können bei Bedarf ergänzt werden.
 
 Atlas ist modular aufgebaut.
 
-Neue Infrastruktur-Dienste können ergänzt werden, ohne bestehende Komponenten anpassen zu müssen.
+Neue Infrastruktur-Komponenten können ergänzt werden, ohne bestehende Komponenten anpassen zu müssen.
 
 Neue Projekte bauen auf der bestehenden Infrastruktur auf und folgen denselben Architekturstandards.
 
