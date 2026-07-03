@@ -38,6 +38,9 @@ readonly REQUIRED_CERT_FILES=(
     atlas.cnf
 )
 
+# Backup retention
+readonly DAILY_RETENTION=7
+
 # ==================================================
 # Functions
 # ==================================================
@@ -221,6 +224,38 @@ verify_backup() {
     echo
 }
 
+rotate_backups() {
+    echo "==> Rotating backups..."
+
+    mapfile -t backups < <(
+        find "${BACKUP_ROOT}" \
+            -mindepth 1 \
+            -maxdepth 1 \
+            -type d | sort
+    )
+
+    local backup_count=${#backups[@]}
+
+    if (( backup_count <= DAILY_RETENTION )); then
+        echo "No old backups to remove."
+        echo
+        return
+    fi
+
+    local backups_to_delete=$((backup_count - DAILY_RETENTION))
+
+    for ((i=0; i<backups_to_delete; i++)); do
+        echo "Deleting backup:"
+        echo "  $(basename "${backups[i]}")"
+
+        rm -rf "${backups[i]}"
+    done
+
+    echo
+    echo "Backup rotation completed."
+    echo
+}
+
 main() {
     echo
     echo "======================================="
@@ -242,6 +277,9 @@ main() {
 
     # Verify backup integrity.
     verify_backup
+
+    # Remove backups exceeding the retention limit.
+    rotate_backups
 
     echo "======================================="
     echo " Backup completed successfully."
