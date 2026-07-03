@@ -4,7 +4,7 @@ Dieses Dokument beschreibt die grundlegende Architektur der Atlas-Plattform.
 
 Es definiert die übergeordneten Prinzipien, Komponenten und Strukturen, nach denen Atlas entwickelt und erweitert wird.
 
-Detaillierte Entscheidungen zu einzelnen Themen wie Backup, Sicherheit oder Netzwerk befinden sich in separaten Architekturdokumenten.
+Detaillierte Entscheidungen zu einzelnen Themen wie Backup, Sicherheit oder Ereignisverarbeitung befinden sich in separaten Architekturdokumenten.
 
 Ziel ist eine reproduzierbare, modulare, sichere und langfristig wartbare Entwicklungsplattform.
 
@@ -32,15 +32,15 @@ Atlas verfolgt konsequent das Prinzip der Single Responsibility.
 
 Jede Komponente besitzt genau eine klar definierte Aufgabe und kennt keine internen Details anderer Komponenten.
 
-Beispiele:
-
 | Komponente | Verantwortung |
 |------------|---------------|
 | Traefik | Routing, HTTPS und Reverse Proxy |
 | PostgreSQL | Persistente Datenspeicherung |
 | n8n | Workflow- und Automatisierungsplattform |
 | Backup Engine | Erstellung und Verifikation von Backups |
+| Restore Engine | Wiederherstellung von Backups |
 | Event System | Bereitstellung von Ereignissen für Automatisierungen |
+| systemd Timer | Automatische Ausführung geplanter Backups |
 
 Dadurch bleiben Komponenten unabhängig voneinander austauschbar und können getrennt weiterentwickelt werden.
 
@@ -77,6 +77,8 @@ Alle Infrastruktur-Dienste kommunizieren ausschließlich über das gemeinsame Do
 
 Traefik bildet den zentralen Einstiegspunkt für sämtliche Webanwendungen der Plattform.
 
+Zeitgesteuerte Aufgaben wie Backups werden unabhängig von den Containern über systemd ausgeführt.
+
 ---
 
 # Infrastruktur
@@ -89,19 +91,28 @@ Aktuelle Infrastruktur-Dienste:
 - PostgreSQL
 - n8n
 
+Weitere Infrastruktur-Komponenten:
+
+- Backup Engine
+- Restore Engine
+- Event System
+- Scheduled Backups (systemd)
+
 Geplante Infrastruktur-Dienste:
 
 - Redis
 - Monitoring
-- Backup
-- Event-System
 
-Jeder Infrastruktur-Dienst besitzt:
+Jede Infrastruktur-Komponente besitzt:
+
+- eine klar definierte Verantwortung
+- eine eigene Dokumentation
+- eine reproduzierbare Konfiguration
+
+Containerbasierte Dienste besitzen zusätzlich:
 
 - ein eigenes Compose-Projekt
 - ein eigenes Datenverzeichnis
-- eine eigene Dokumentation
-- einen klar definierten Verantwortungsbereich
 
 ---
 
@@ -138,7 +149,8 @@ Die Infrastruktur verwendet unter `/opt/atlas` eine einheitliche Verzeichnisstru
 ├── docs/
 ├── logs/
 ├── repositories/
-└── scripts/
+├── scripts/
+└── systemd/
 ```
 
 ---
@@ -149,7 +161,7 @@ Für alle Infrastruktur-Komponenten gelten gemeinsame Standards.
 
 ## Docker Compose
 
-Jeder Dienst besitzt ein eigenes Compose-Projekt.
+Jeder containerisierte Dienst besitzt ein eigenes Compose-Projekt.
 
 ```text
 compose/
@@ -204,6 +216,16 @@ Dadurch bleiben Compose-Dateien unabhängig von vertraulichen Informationen und 
 
 ---
 
+## Automatisierung
+
+Wiederkehrende Systemaufgaben werden über systemd Services und Timer ausgeführt.
+
+Die eigentliche Logik verbleibt in den entsprechenden Skripten.
+
+Dadurch bleiben Planung und Implementierung voneinander getrennt.
+
+---
+
 # Architekturdomänen
 
 Die Gesamtarchitektur wird in mehrere eigenständige Themenbereiche unterteilt.
@@ -211,11 +233,10 @@ Die Gesamtarchitektur wird in mehrere eigenständige Themenbereiche unterteilt.
 | Dokument | Inhalt |
 |----------|--------|
 | architecture.md | Gesamtarchitektur |
-| backup-strategy.md | Backup und Disaster Recovery |
-| networking.md | Netzwerkarchitektur |
-| security.md | Sicherheitsarchitektur |
-| storage.md | Datenhaltung |
+| backup-strategy.md | Backup- und Restore-Architektur |
 | event-system.md | Ereignisse und Automatisierung |
+
+Weitere Architekturdokumente können bei Bedarf ergänzt werden.
 
 ---
 

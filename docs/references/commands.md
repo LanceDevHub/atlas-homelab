@@ -33,6 +33,70 @@ Beispiel:
 
 ---
 
+# Scheduled Backups
+
+## Backup-Service starten
+
+```bash
+sudo systemctl start atlas-backup.service
+```
+
+---
+
+## Backup-Service Status
+
+```bash
+sudo systemctl status atlas-backup.service
+```
+
+---
+
+## Backup-Timer starten
+
+```bash
+sudo systemctl start atlas-backup.timer
+```
+
+---
+
+## Backup-Timer aktivieren
+
+```bash
+sudo systemctl enable atlas-backup.timer
+```
+
+---
+
+## Backup-Timer Status
+
+```bash
+sudo systemctl status atlas-backup.timer
+```
+
+---
+
+## Alle Timer anzeigen
+
+```bash
+systemctl list-timers
+```
+
+---
+
+## Backup-Logs anzeigen
+
+```bash
+journalctl -u atlas-backup.service
+```
+
+Live:
+
+```bash
+journalctl -fu atlas-backup.service
+```
+
+---
+
 # Docker
 
 ## Status eines Compose-Projekts
@@ -105,6 +169,14 @@ psql \
 
 ---
 
+## Datenbank wechseln
+
+```sql
+\c <database>
+```
+
+---
+
 ## Datenbanken anzeigen
 
 ```sql
@@ -125,6 +197,43 @@ psql \
 
 ```sql
 \du
+```
+
+---
+
+## Tabelle erstellen
+
+```sql
+CREATE TABLE test (
+    id SERIAL PRIMARY KEY,
+    name TEXT
+);
+```
+
+---
+
+## Datensatz einfügen
+
+```sql
+INSERT INTO test (name)
+VALUES ('Atlas');
+```
+
+---
+
+## Tabelle auslesen
+
+```sql
+SELECT *
+FROM test;
+```
+
+---
+
+## Tabelle löschen
+
+```sql
+DROP TABLE test;
 ```
 
 ---
@@ -241,6 +350,14 @@ backup.dump
 
 ---
 
+## systemd
+
+```text
+/opt/atlas/systemd
+```
+
+---
+
 # Git
 
 ## Repository aktualisieren
@@ -272,6 +389,46 @@ git commit -m "<message>"
 
 ```bash
 git push
+```
+
+---
+
+## Tags anzeigen
+
+```bash
+git tag
+```
+
+---
+
+## Tag erstellen
+
+```bash
+git tag <tag-name>
+```
+
+---
+
+## Tag veröffentlichen
+
+```bash
+git push origin <tag-name>
+```
+
+---
+
+## Tag löschen
+
+Lokal:
+
+```bash
+git tag -d <tag-name>
+```
+
+Remote:
+
+```bash
+git push origin --delete <tag-name>
 ```
 
 ---
@@ -347,5 +504,6 @@ scp file.txt lenny@atlas:/path/
 ├── docs/
 ├── logs/
 ├── repositories/
-└── scripts/
+├── scripts/
+└── systemd/
 ```

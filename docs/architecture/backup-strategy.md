@@ -132,6 +132,7 @@ Folgende Daten werden bewusst nicht gesichert.
 compose/
 docs/
 scripts/
+systemd/
 ```
 
 Diese Daten werden vollständig über Git verwaltet.
@@ -173,10 +174,10 @@ Die Backup Engine ist für die Erstellung und Verifikation eines Backups verantw
 
 Sie erstellt:
 
-- PostgreSQL-Dump
+- einen Dump jeder PostgreSQL-Datenbank
 - Anwendungsdaten
 - Konfigurationsdateien
-- Zertifikate
+- TLS-Zertifikate
 - Backup-Metadaten
 
 Die Backup Engine kennt keine externen Speicherziele.
@@ -278,15 +279,21 @@ Das Backup ergänzt ausschließlich die Laufzeitdaten.
 
 # Automatisierung
 
-Backups sollen vollständig automatisiert erstellt werden.
+Backups werden automatisch über einen systemd-Timer erstellt.
 
-Langfristig umfasst dies:
+Aktuell umfasst die Automatisierung:
 
 - tägliche Backups
-- wöchentliche Backups
-- automatische Übertragung
+- Backup-Verifikation
 - Backup-Rotation
 - Restore-Unterstützung
+
+Geplante Erweiterungen:
+
+- Offsite-Übertragung
+- Benachrichtigungen
+- wöchentliche Backups
+- monatliche Backups
 
 ---
 
@@ -317,8 +324,9 @@ Atlas trifft folgende grundlegende Architekturentscheidungen.
 - Backups sind die Quelle der Laufzeitdaten.
 - Backups werden zunächst lokal erstellt.
 - Langfristige Speicherung erfolgt auf externen Systemen.
-- Benachrichtigungen werden ausschließlich über das Event-System verarbeitet.
 - Backup-Erstellung und Backup-Speicherung sind voneinander entkoppelt.
+- Wiederkehrende Backups werden automatisch über systemd ausgeführt.
+- Benachrichtigungen werden ausschließlich über das Event-System verarbeitet.
 
 ---
 
@@ -336,12 +344,18 @@ Atlas trifft folgende grundlegende Architekturentscheidungen.
 
 ✅ Backup Engine implementiert
 
-✅ Restore Engine implementieren
+✅ Restore Engine implementiert
+
+✅ Backup-Rotation implementiert
+
+✅ Geplante Backups über systemd
+
+✅ Vollständigen Restore getestet
 
 ⬜ Backup-Übertragung implementieren
 
 ⬜ Event-System integrieren
 
-⬜ Automatische Backup-Rotation
+⬜ Benachrichtigungen implementieren
 
-✅ Vollständigen Restore testen
+⬜ Wöchentliche und monatliche Backups
