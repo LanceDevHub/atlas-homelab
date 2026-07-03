@@ -336,7 +336,7 @@ Atlas trifft folgende grundlegende Architekturentscheidungen.
 
 ✅ Backup Engine implementiert
 
-⬜ Restore Engine implementieren
+✅ Restore Engine implementieren
 
 ⬜ Backup-Übertragung implementieren
 
@@ -344,4 +344,4 @@ Atlas trifft folgende grundlegende Architekturentscheidungen.
 
 ⬜ Automatische Backup-Rotation
 
-⬜ Vollständigen Restore testen
+✅ Vollständigen Restore testen
