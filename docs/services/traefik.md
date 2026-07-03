@@ -1,212 +1,404 @@
-# n8n
+# Traefik
 
 ## Zweck
 
-n8n ist die zentrale Workflow- und Automatisierungsplattform der Atlas-Infrastruktur.
+Traefik ist der zentrale Reverse Proxy der Atlas-Plattform.
 
-Sie ermöglicht die Erstellung, Ausführung und Verwaltung automatisierter Workflows und bildet die Grundlage für zukünftige Automatisierungen innerhalb von Atlas.
+Er bildet den einzigen öffentlichen Einstiegspunkt für sämtliche Webanwendungen und übernimmt die Verarbeitung eingehender HTTP- und HTTPS-Anfragen.
 
-Geplante Einsatzbereiche:
+Zu seinen Aufgaben gehören insbesondere:
 
-- Systemautomatisierung
-- API-Integrationen
-- Benachrichtigungen
-- Datenverarbeitung
-- Eigene Workflows
+- Routing anhand des Hostnamens
+- TLS-Terminierung (HTTPS)
+- HTTP-zu-HTTPS-Weiterleitung
+- Bereitstellung zentraler HTTP Security Header
+- Automatische Erkennung veröffentlichter Docker-Container
+
+Dadurch müssen einzelne Dienste keine eigene HTTPS-Konfiguration oder Webserver betreiben.
 
 ---
 
 # Architektur
 
-n8n wird ausschließlich als Docker-Container betrieben.
-
-Alle Konfigurationsdaten und Workflows werden außerhalb des Containers gespeichert und bleiben dadurch auch nach einem Neustart oder einer Neuerstellung des Containers erhalten.
-
-```text
-/opt/atlas
-├── compose/
-│   └── n8n/
-│       ├── compose.yaml
-│       └── .env
-│
-└── data/
-    └── n8n/
-```
-
----
-
-# Docker-Integration
-
-n8n besitzt ein eigenes Docker-Compose-Projekt.
-
-Die Konfiguration befindet sich unter
-
-```text
-/opt/atlas/compose/n8n
-```
-
-Die persistenten Daten werden unter
-
-```text
-/opt/atlas/data/n8n
-```
-
-gespeichert.
-
----
-
-# Docker-Netzwerk
-
-n8n ist mit dem gemeinsamen Docker-Netzwerk
+Traefik wird ausschließlich als Docker-Container betrieben und ist Mitglied des gemeinsamen Docker-Netzwerks
 
 ```text
 atlas-network
 ```
 
-verbunden.
-
-Dadurch können Infrastruktur-Dienste direkt über ihre Docker-Service-Namen erreicht werden.
-
-Aktuell nutzt n8n folgende Dienste:
-
-| Dienst     | Hostname |
-| ---------- | -------- |
-| PostgreSQL | postgres |
-
----
-
-# Datenhaltung
-
-Persistiert werden unter anderem:
-
-- Workflows
-- Zugangsdaten (Credentials)
-- Benutzerkonten
-- Einstellungen
-- Verschlüsselungsschlüssel
-- Ausführungsdaten
-
-Alle Daten befinden sich unter
+Alle Webanwendungen kommunizieren ausschließlich mit Traefik.
 
 ```text
-/opt/atlas/data/n8n
+                 Browser
+                     │
+                 HTTP / HTTPS
+                     │
+                     ▼
+                 Traefik
+                     │
+             atlas-network
+      ┌──────────────┴──────────────┐
+      │                             │
+    n8n                     weitere Dienste
 ```
 
-Der Container selbst bleibt zustandslos und kann jederzeit neu erstellt werden.
+Traefik bildet damit den zentralen Einstiegspunkt der gesamten Webplattform.
 
 ---
 
-# Datenbank
+# Anfragefluss
 
-n8n verwendet PostgreSQL als zentrale Datenbank.
+Eine HTTPS-Anfrage durchläuft innerhalb der Atlas-Plattform folgenden Weg:
 
-Die Verbindung erfolgt über das gemeinsame Docker-Netzwerk.
+```text
+Browser
+    │
+ HTTPS
+    │
+    ▼
+Traefik
+(TLS Termination)
+    │
+ HTTP
+    │
+    ▼
+Backend Service
+```
 
-Eigene SQLite-Dateien werden nicht verwendet.
+Die TLS-Verschlüsselung endet an Traefik.
+
+Die Kommunikation zwischen Traefik und den Containern erfolgt anschließend unverschlüsselt über das isolierte Docker-Netzwerk.
+
+Dadurch müssen Backend-Dienste selbst kein HTTPS unterstützen.
 
 ---
 
-# Netzwerkzugriff
+# Docker-Integration
 
-n8n veröffentlicht keine Ports auf dem Raspberry Pi.
+Traefik verwendet den Docker Provider.
 
-Der Zugriff erfolgt ausschließlich über den zentralen Reverse Proxy Traefik.
+Dadurch erkennt Traefik automatisch:
 
-Aktuell ist n8n unter
+- laufende Container
+- Docker Labels
+- Netzwerke
+- veröffentlichte Dienste
+
+Neue Dienste müssen lediglich Docker Labels definieren.
+
+Eine zentrale Routing-Konfiguration ist dadurch nicht erforderlich.
+
+---
+
+# Docker Provider
+
+Der Docker Provider überwacht kontinuierlich die Docker Engine.
+
+Sobald ein neuer Container gestartet wird, liest Traefik dessen Docker Labels aus und erstellt daraus automatisch:
+
+- Router
+- Services
+- Routingregeln
+
+Nur Container mit
+
+```text
+traefik.enable=true
+```
+
+werden veröffentlicht.
+
+Alle anderen Container bleiben standardmäßig unsichtbar.
+
+---
+
+# File Provider
+
+Neben Docker verwendet Atlas den File Provider.
+
+Dieser stellt Konfigurationen bereit, die keinem einzelnen Container gehören.
+
+Aktuell werden darüber verwaltet:
+
+- TLS-Zertifikate
+- HTTP Security Header
+
+Die Konfiguration befindet sich unter
+
+```text
+/opt/atlas/compose/traefik/config
+```
+
+---
+
+# EntryPoints
+
+EntryPoints definieren, auf welchen Ports Traefik Anfragen entgegennimmt.
+
+## web
+
+```text
+Port 80
+```
+
+Der EntryPoint dient ausschließlich dazu, HTTP-Anfragen entgegenzunehmen und automatisch auf HTTPS umzuleiten.
+
+Eine direkte Bereitstellung von Anwendungen erfolgt darüber nicht.
+
+---
+
+## websecure
+
+```text
+Port 443
+```
+
+Dieser EntryPoint verarbeitet sämtliche HTTPS-Anfragen.
+
+Alle veröffentlichten Dienste verwenden ausschließlich diesen EntryPoint.
+
+---
+
+# Routing
+
+Traefik verarbeitet eingehende Anfragen in mehreren Schritten.
+
+```text
+Request
+    │
+    ▼
+Router
+    │
+Middleware
+    │
+Service
+```
+
+---
+
+## Router
+
+Ein Router entscheidet anhand definierter Regeln, welcher Dienst eine Anfrage verarbeiten soll.
+
+In Atlas erfolgt das Routing über den Hostnamen.
+
+Beispiel:
+
+```text
+n8n.home.arpa
+```
+
+↓
+
+```text
+n8n
+```
+
+---
+
+## Middleware
+
+Middlewares verändern oder erweitern Anfragen und Antworten.
+
+Aktuell verwendet Atlas eine zentrale Middleware für HTTP Security Header.
+
+Sie wird über den File Provider bereitgestellt und von allen veröffentlichten Diensten genutzt.
+
+---
+
+## Services
+
+Ein Service beschreibt den eigentlichen Zielcontainer.
+
+Bei n8n wird beispielsweise der interne Container-Port
+
+```text
+5678
+```
+
+verwendet.
+
+---
+
+# TLS
+
+Traefik übernimmt die vollständige TLS-Terminierung.
+
+Backend-Dienste benötigen daher keine eigene HTTPS-Konfiguration.
+
+---
+
+## Zertifikate
+
+TLS-Zertifikate werden zentral gespeichert.
+
+```text
+/opt/atlas/certs
+```
+
+Aktuell werden verwendet:
+
+```text
+atlas.crt
+atlas.key
+```
+
+Traefik lädt diese Zertifikate über den File Provider.
+
+---
+
+## TLS-Terminierung
+
+Die TLS-Verbindung endet an Traefik.
+
+Innerhalb des Docker-Netzwerks kommunizieren die Dienste weiterhin per HTTP.
+
+Dies reduziert den Konfigurationsaufwand erheblich und ermöglicht eine zentrale Verwaltung sämtlicher Zertifikate.
+
+---
+
+## HTTP → HTTPS
+
+Alle HTTP-Anfragen werden automatisch dauerhaft auf HTTPS umgeleitet.
 
 ```text
 http://n8n.home.arpa
+            │
+            ▼
+301 Redirect
+            │
+            ▼
+https://n8n.home.arpa
 ```
 
-erreichbar.
-
-Traefik leitet eingehende Anfragen automatisch über das gemeinsame Docker-Netzwerk an den n8n-Container weiter.
+Dadurch werden sämtliche Webanwendungen ausschließlich verschlüsselt bereitgestellt.
 
 ---
 
-# Traefik-Integration
+# HTTP Security Header
 
-Die Veröffentlichung erfolgt vollständig über Docker Labels innerhalb der Compose-Datei.
+Traefik stellt zentrale HTTP Security Header bereit.
 
-Dabei definiert n8n selbst:
+Aktuell werden verwendet:
 
-- ob der Dienst veröffentlicht werden soll
-- unter welchem Hostnamen er erreichbar ist
-- über welchen EntryPoint Anfragen angenommen werden
-- welcher interne Port verwendet wird
+| Header | Zweck |
+| ------- | ----- |
+| Strict-Transport-Security | Erzwingt zukünftige HTTPS-Verbindungen |
+| X-Content-Type-Options | Verhindert MIME-Type-Sniffing |
+| X-Frame-Options | Schutz vor Clickjacking |
+| Referrer-Policy | Begrenzt übertragene Referrer-Informationen |
 
-Dadurch ist keine zentrale Routing-Konfiguration erforderlich.
+Die Header werden einmalig in Traefik definiert und gelten automatisch für alle veröffentlichten Dienste.
+
+---
+
+# Docker Labels
+
+Die Veröffentlichung einzelner Dienste erfolgt vollständig über Docker Labels.
+
+Ein Dienst definiert dort unter anderem:
+
+- ob er veröffentlicht werden soll
+- unter welchem Hostnamen
+- welcher EntryPoint verwendet wird
+- ob TLS aktiviert ist
+- welcher interne Port angesprochen wird
+
+Dadurch beschreibt jeder Dienst seine eigene Veröffentlichung selbst.
+
+---
+
+# Docker Socket
+
+Traefik erhält ausschließlich lesenden Zugriff auf den Docker Socket.
+
+```text
+/var/run/docker.sock
+```
+
+Dadurch kann Traefik:
+
+- Container erkennen
+- Docker Labels lesen
+- Router erzeugen
+- Services erzeugen
+
+Der Docker Socket wird ausschließlich read-only eingebunden.
 
 ---
 
 # Architekturentscheidungen
 
-## Containerisierung
+## Zentraler Reverse Proxy
 
-n8n wird ausschließlich als Docker-Container betrieben.
+Atlas besitzt genau einen öffentlichen Einstiegspunkt.
 
-**Gründe**
+Alle Webanwendungen werden ausschließlich über Traefik veröffentlicht.
 
-- reproduzierbare Bereitstellung
-- einfache Updates
-- saubere Trennung vom Hostsystem
+Dadurch existiert nur eine zentrale Stelle für Routing und Sicherheitsfunktionen.
 
 ---
 
-## Persistente Daten
+## TLS-Terminierung
 
-Alle Konfigurations- und Workflowdaten werden außerhalb des Containers gespeichert.
+HTTPS wird ausschließlich von Traefik verarbeitet.
 
-Dadurch bleiben sämtliche Daten auch nach einem Container-Update erhalten.
+Backend-Dienste kommunizieren intern weiterhin unverschlüsselt über das isolierte Docker-Netzwerk.
 
----
-
-## PostgreSQL statt SQLite
-
-Für Atlas wird PostgreSQL als Datenbank verwendet.
-
-**Gründe**
-
-- bessere Skalierbarkeit
-- gemeinsame Datenbankplattform
-- höhere Zuverlässigkeit
-- einheitliche Infrastruktur
+Dies reduziert die Komplexität der einzelnen Dienste erheblich.
 
 ---
 
-## Reverse Proxy
+## Automatische Service-Erkennung
 
-n8n wird nicht direkt veröffentlicht.
+Traefik erkennt neue Dienste automatisch über Docker Labels.
 
-Der gesamte externe Zugriff erfolgt ausschließlich über Traefik.
-
-Dadurch existiert innerhalb der Atlas-Plattform nur ein zentraler Einstiegspunkt für HTTP- und HTTPS-Anfragen.
+Neue Anwendungen können dadurch integriert werden, ohne eine zentrale Routing-Datei anpassen zu müssen.
 
 ---
 
-## Konfiguration
+## Zentrale Sicherheitsfunktionen
 
-Sensible Konfigurationswerte werden über eine `.env`-Datei verwaltet.
+HTTPS, HTTP-Weiterleitungen sowie HTTP Security Header werden ausschließlich in Traefik konfiguriert.
 
-Dazu gehören unter anderem:
+Dadurch erhalten alle veröffentlichten Dienste automatisch dieselben Sicherheitsstandards.
 
-- Hostname
-- Datenbankzugang
-- Zeitzone
-- Passwörter
+---
 
-Dadurch kann die Compose-Datei versioniert werden, ohne vertrauliche Informationen zu enthalten.
+## Trennung statischer und dynamischer Konfiguration
+
+Traefik unterscheidet zwischen statischer und dynamischer Konfiguration.
+
+Die statische Konfiguration erfolgt innerhalb der Compose-Datei und definiert unter anderem:
+
+- Provider
+- EntryPoints
+- Ports
+- Logging
+
+Die dynamische Konfiguration wird über den File Provider bereitgestellt und enthält aktuell:
+
+- TLS-Zertifikate
+- HTTP Security Header
+
+Diese Trennung verbessert die Wartbarkeit und Erweiterbarkeit der Infrastruktur.
 
 ---
 
 # Status
 
-✅ n8n erfolgreich integriert
+✅ Traefik erfolgreich integriert
 
-✅ PostgreSQL als Datenbank eingebunden
+✅ Docker Provider eingerichtet
 
-✅ Traefik als Reverse Proxy eingerichtet
+✅ File Provider eingerichtet
 
-✅ Zugriff ausschließlich über Traefik
+✅ HTTPS vollständig integriert
 
-✅ Docker Labels für automatisches Routing eingerichtet
+✅ TLS-Terminierung eingerichtet
+
+✅ HTTP-zu-HTTPS-Weiterleitung aktiviert
+
+✅ HTTP Security Header zentral konfiguriert
+
+✅ Dashboard über HTTPS erreichbar

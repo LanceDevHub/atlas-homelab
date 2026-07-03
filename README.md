@@ -14,7 +14,7 @@ Dabei steht nicht eine einzelne Anwendung im Mittelpunkt, sondern die Plattform 
 
 ## Mission
 
-Atlas verfolgt das Ziel, eine stabile und kontinuierlich wachsende Entwicklungsplattform aufzubauen.
+Atlas verfolgt das Ziel, eine stabile, sichere und kontinuierlich wachsende Entwicklungsplattform aufzubauen.
 
 Neue Technologien sollen praxisnah erlernt, Ideen schnell prototypisch umgesetzt und Software reproduzierbar bereitgestellt werden.
 
@@ -28,7 +28,7 @@ Atlas ist kein Raspberry Pi mit einigen installierten Diensten.
 
 Atlas ist eine persönliche Plattform, auf der Infrastruktur, Automatisierung und Softwareentwicklung gemeinsam wachsen.
 
-Jedes Projekt soll auf einer sauberen, dokumentierten und reproduzierbaren Infrastruktur aufbauen.
+Jedes Projekt soll auf einer dokumentierten, reproduzierbaren und wartbaren Infrastruktur aufbauen.
 
 ---
 
@@ -39,7 +39,8 @@ Jedes Projekt soll auf einer sauberen, dokumentierten und reproduzierbaren Infra
 - Linux sicher administrieren
 - Docker und Docker Compose verstehen
 - Containerisierte Infrastruktur aufbauen
-- n8n kennenlernen
+- Reverse Proxy verstehen
+- HTTPS und TLS verstehen
 - Eine saubere Dokumentation etablieren
 
 ### Mittelfristig
@@ -48,7 +49,8 @@ Jedes Projekt soll auf einer sauberen, dokumentierten und reproduzierbaren Infra
 - Fullstack-Projekte hosten
 - Automatisierungen entwickeln
 - Datenbanken professionell einsetzen
-- Reverse Proxy und Monitoring integrieren
+- Backup- und Restore-Strategien entwickeln
+- Monitoring integrieren
 - CI/CD und Deployment kennenlernen
 
 ### Langfristig
@@ -75,75 +77,113 @@ Bei der Entwicklung von Atlas gelten folgende Grundsätze:
 ## Repository-Struktur
 
 ```text
-atlas-homelab/
-│
+atlas/
+├── compose/
 ├── docs/
-│   ├── architecture/
-│   ├── reference/
+│   ├── references/
 │   ├── services/
 │   └── setup/
-│
+├── scripts/
+├── .gitignore
+└── README.md
+```
+
+Die eigentliche Infrastruktur wird auf dem Raspberry Pi unter
+
+```text
+/opt/atlas
+```
+
+betrieben.
+
+Dort befinden sich zusätzlich die Laufzeitdaten:
+
+```text
+/opt/atlas
+├── backups/
+├── certs/
 ├── compose/
-├── infrastructure/
-├── projects/
+├── data/
+├── docs/
+├── logs/
+├── repositories/
 └── scripts/
 ```
 
-> Dieses Repository dokumentiert den Aufbau von Atlas. Die eigentliche Infrastruktur wird aktuell direkt auf dem Raspberry Pi aufgebaut und betrieben.
+---
+
+# Aktueller Entwicklungsstand
+
+## Version 0.3.1 – Infrastrukturplattform
+
+### Hostsystem
+
+- ✅ Raspberry Pi eingerichtet
+- ✅ SSH mit Public-Key-Authentifizierung
+- ✅ SSH-Härtung durchgeführt
+- ✅ Tailscale eingerichtet
+- ✅ UFW-Firewall konfiguriert
+
+### Container-Plattform
+
+- ✅ Docker Engine installiert
+- ✅ Docker Compose eingerichtet
+- ✅ Gemeinsames Docker-Netzwerk eingerichtet
+
+### Infrastruktur
+
+- ✅ Traefik als zentraler Reverse Proxy integriert
+- ✅ PostgreSQL integriert
+- ✅ n8n integriert
+
+### Sicherheit
+
+- ✅ HTTPS vollständig eingerichtet
+- ✅ TLS-Zertifikate integriert
+- ✅ HTTP → HTTPS Redirect
+- ✅ HTTP Security Header
+- ✅ Zentrale TLS-Terminierung
+
+### Dokumentation
+
+- ✅ Architektur dokumentiert
+- ✅ Infrastruktur dokumentiert
+- ✅ Service-Dokumentationen erstellt
+- ✅ Linux-Referenz erstellt
+- ✅ Docker-Referenzen erstellt
 
 ---
 
-## Aktueller Entwicklungsstand
+# Roadmap
 
-### Version 0.2 – Basisplattform
+## Version 0.4 – Reliability
 
-#### Infrastruktur
+Ziel ist der zuverlässige Betrieb der Plattform.
 
-✅ Raspberry Pi eingerichtet
+Geplante Themen:
 
-✅ SSH mit Public-Key-Authentifizierung
-
-✅ SSH-Härtung durchgeführt
-
-✅ Tailscale eingerichtet
-
-✅ UFW-Firewall konfiguriert
-
-✅ Docker Engine installiert
-
-✅ Docker Compose eingerichtet
-
-✅ Atlas-Verzeichnisstruktur aufgebaut
-
-✅ Gemeinsames Docker-Netzwerk eingerichtet
-
-#### Dienste
-
-✅ PostgreSQL als Docker-Container integriert
-
-✅ n8n mit PostgreSQL verbunden
-
-#### Dokumentation
-
-✅ Architektur dokumentiert
-
-✅ Setup dokumentiert
-
-✅ Docker- und PostgreSQL-Referenzen erstellt
+- Backup-Konzept
+- Restore-Konzept
+- Monitoring
+- Logging
+- Update-Strategien
 
 ---
 
-## Nächster Meilenstein
+## Version 0.5 – Erste Projekte
 
-### Infrastruktur erweitern
+Die Infrastruktur dient als Grundlage für erste produktive Anwendungen.
 
-- Reverse Proxy (Traefik oder Caddy)
-- Redis integrieren
-- Backup-Strategie entwickeln
-- Monitoring aufbauen
+Geplant sind unter anderem:
 
-### Dokumentation erweitern
+- CrewSync
+- Eigene APIs
+- Weitere Fullstack-Projekte
 
-- n8n-Dokumentation ergänzen
-- Infrastruktur-Dokumentation aktualisieren
-- Weitere Referenzen erstellen
+---
+
+## Version 1.0
+
+Atlas bildet eine vollständig dokumentierte und reproduzierbare Entwicklungsplattform.
+
+Neue Projekte können auf einer bestehenden Infrastruktur entwickelt, betrieben und erweitert werden.

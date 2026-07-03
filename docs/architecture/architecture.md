@@ -4,7 +4,7 @@ Dieses Dokument beschreibt die grundlegende Architektur der Atlas-Plattform.
 
 Es definiert die Prinzipien, Komponenten und Strukturen, nach denen Infrastruktur und zukünftige Projekte aufgebaut werden.
 
-Ziel ist eine reproduzierbare, modulare und langfristig wartbare Entwicklungsplattform.
+Ziel ist eine reproduzierbare, modulare, sichere und langfristig wartbare Entwicklungsplattform.
 
 ---
 
@@ -18,6 +18,7 @@ Atlas basiert auf folgenden Grundprinzipien:
 - Klare Verantwortlichkeiten
 - Zentrale Dokumentation
 - Modulare Erweiterbarkeit
+- Zentrale Sicherheitsfunktionen
 
 ---
 
@@ -26,33 +27,34 @@ Atlas basiert auf folgenden Grundprinzipien:
 Atlas besteht aus mehreren logisch getrennten Ebenen.
 
 ```text
-                     Atlas
+                    Atlas
 
-                        │
+                       │
 
-               Raspberry Pi 5
+              Raspberry Pi 5
 
-                        │
+                       │
 
-                 Docker Engine
+                Docker Engine
 
-                        │
+                       │
 
-                 atlas-network
+                atlas-network
 
-                     Traefik
-                        │
-        ┌───────────────┴───────────────┐
-        │                               │
-   PostgreSQL                        n8n
+                    Traefik
+              (TLS Termination)
+                       │
+        ┌──────────────┴──────────────┐
+        │                             │
+   PostgreSQL                      n8n
         │
         ▼
 /opt/atlas/data/postgres
 ```
 
-Die Infrastruktur-Dienste kommunizieren über ein gemeinsames Docker-Netzwerk (`atlas-network`) und können dadurch unabhängig voneinander betrieben werden.
+Alle Infrastruktur-Dienste kommunizieren über das gemeinsame Docker-Netzwerk `atlas-network` und können dadurch unabhängig voneinander betrieben werden.
 
-Traefik bildet den zentralen Einstiegspunkt für alle Webanwendungen innerhalb der Plattform.
+Traefik bildet den zentralen Einstiegspunkt für sämtliche Webanwendungen der Plattform und übernimmt Routing, HTTPS sowie weitere Sicherheitsfunktionen.
 
 ---
 
@@ -103,6 +105,7 @@ Die Infrastruktur verwendet unter `/opt/atlas` eine einheitliche Verzeichnisstru
 ```text
 /opt/atlas
 ├── backups/
+├── certs/
 ├── compose/
 │   ├── postgres/
 │   ├── traefik/
@@ -110,6 +113,7 @@ Die Infrastruktur verwendet unter `/opt/atlas` eine einheitliche Verzeichnisstru
 ├── data/
 │   ├── postgres/
 │   └── n8n/
+├── docs/
 ├── logs/
 ├── repositories/
 └── scripts/
@@ -183,6 +187,31 @@ Nur Traefik veröffentlicht Ports auf dem Hostsystem.
 
 Alle übrigen Dienste kommunizieren ausschließlich über das gemeinsame Docker-Netzwerk und veröffentlichen keine eigenen HTTP- oder HTTPS-Ports.
 
+Traefik übernimmt zusätzlich:
+
+- TLS-Terminierung
+- HTTP-zu-HTTPS-Weiterleitungen
+- HTTP Security Header
+- Routing anhand des Hostnamens
+
+---
+
+## HTTPS
+
+HTTPS wird zentral durch Traefik bereitgestellt.
+
+Backend-Dienste kommunizieren weiterhin unverschlüsselt innerhalb des isolierten Docker-Netzwerks.
+
+TLS-Zertifikate werden zentral unter
+
+```text
+/opt/atlas/certs
+```
+
+verwaltet.
+
+Dadurch müssen einzelne Dienste keine eigene HTTPS-Konfiguration besitzen.
+
 ---
 
 ## Konfiguration
@@ -211,5 +240,6 @@ Die Architektur verfolgt folgende Ziele:
 - modulare Erweiterbarkeit
 - einfache Wartbarkeit
 - klare Verantwortlichkeiten
+- zentrale Sicherheitsfunktionen
 - saubere Dokumentation
 - langfristige Skalierbarkeit

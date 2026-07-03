@@ -69,13 +69,9 @@ Dadurch können Infrastruktur-Dienste direkt über ihre Docker-Service-Namen err
 
 Aktuell nutzt n8n folgende Dienste:
 
-| Dienst     | Hostname |
-| ---------- | -------- |
+| Dienst | Hostname |
+| -------- | -------- |
 | PostgreSQL | postgres |
-
-Die Verbindung zu PostgreSQL erfolgt ausschließlich über den Docker-Service-Namen `postgres`.
-
-Innerhalb der Atlas-Plattform werden keine festen IP-Adressen verwendet.
 
 ---
 
@@ -119,12 +115,19 @@ Der Zugriff erfolgt ausschließlich über den zentralen Reverse Proxy Traefik.
 Aktuell ist n8n unter
 
 ```text
-http://n8n.home.arpa
+https://n8n.home.arpa
 ```
 
 erreichbar.
 
-Traefik leitet eingehende HTTP-Anfragen automatisch über das gemeinsame Docker-Netzwerk an den n8n-Container weiter.
+Traefik übernimmt dabei:
+
+- TLS-Terminierung
+- HTTP-zu-HTTPS-Weiterleitung
+- Routing anhand des Hostnamens
+- Zentrale Security Header
+
+Die Kommunikation zwischen Traefik und dem n8n-Container erfolgt weiterhin unverschlüsselt über das interne Docker-Netzwerk.
 
 ---
 
@@ -137,9 +140,12 @@ Dabei definiert n8n selbst:
 - ob der Dienst veröffentlicht werden soll
 - unter welchem Hostnamen er erreichbar ist
 - über welchen EntryPoint Anfragen angenommen werden
-- welcher interne Port verwendet wird
+- dass HTTPS verwendet wird
+- welcher interne Container-Port angesprochen werden soll
 
 Dadurch ist keine zentrale Routing-Konfiguration erforderlich.
+
+TLS-Zertifikate, HTTP-Weiterleitungen sowie Security Header werden zentral durch Traefik verwaltet und müssen innerhalb von n8n nicht konfiguriert werden.
 
 ---
 
@@ -184,7 +190,9 @@ n8n wird nicht direkt veröffentlicht.
 
 Der gesamte externe Zugriff erfolgt ausschließlich über Traefik.
 
-Dadurch existiert innerhalb der Atlas-Plattform nur ein zentraler Einstiegspunkt für HTTP- und HTTPS-Anfragen.
+Traefik übernimmt die TLS-Terminierung sowie die Bereitstellung zentraler Sicherheitsfunktionen wie HTTP-zu-HTTPS-Weiterleitungen und HTTP Security Header.
+
+Dadurch existiert innerhalb der Atlas-Plattform nur ein zentraler Einstiegspunkt für Webanwendungen.
 
 ---
 
@@ -211,6 +219,10 @@ Dadurch kann die Compose-Datei versioniert werden, ohne vertrauliche Information
 
 ✅ Traefik als Reverse Proxy eingerichtet
 
+✅ HTTPS vollständig integriert
+
 ✅ Zugriff ausschließlich über Traefik
 
 ✅ Docker Labels für automatisches Routing eingerichtet
+
+✅ HTTP Security Header werden zentral durch Traefik bereitgestellt
