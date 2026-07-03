@@ -92,13 +92,21 @@ verify_backup() {
         ((errors++))
     fi
 
-    # Verify PostgreSQL dump.
-    if [[ -s "${BACKUP_DIR}/postgres.dump" ]]; then
-        echo "  ✓ PostgreSQL dump"
+    # Verify PostgreSQL dumps.
+    shopt -s nullglob
+
+    local postgres_dumps=("${BACKUP_DIR}"/postgres/*.dump)
+
+    if (( ${#postgres_dumps[@]} > 0 )); then
+        for dump_file in "${postgres_dumps[@]}"; do
+            echo "  ✓ $(basename "${dump_file}")"
+        done
     else
-        echo "  ✗ PostgreSQL dump missing"
+        echo "  ✗ No PostgreSQL dumps found"
         ((errors++))
     fi
+
+    shopt -u nullglob
 
     # Verify n8n data.
     if [[ -d "${BACKUP_DIR}/data/n8n" ]]; then
@@ -256,21 +264,6 @@ backup_current_state() {
     echo
 }
 
-restore_postgres() {
-    echo "==> Restoring PostgreSQL..."
-
-    # Start PostgreSQL and wait until it is ready.
-    start_postgres
-
-    # Recreate the target database.
-    recreate_database
-
-    # Restore the database dump.
-    restore_database
-
-    echo "PostgreSQL restore completed."
-    echo
-}
 
 load_postgres_env() {
 
@@ -303,8 +296,30 @@ start_postgres() {
     echo
 }
 
+restore_postgres() {
+    echo "==> Restoring PostgreSQL..."
+
+    # Start PostgreSQL and wait until it is ready.
+    start_postgres
+
+    # Restore every database dump.
+    for dump_file in "${BACKUP_DIR}"/postgres/*.dump; do
+        local database
+
+        database=$(basename "${dump_file}" .dump)
+
+        recreate_database "${database}"
+        restore_database "${database}" "${dump_file}"
+    done
+
+    echo "PostgreSQL restore completed."
+    echo
+}
+
 recreate_database() {
-    echo "==> Recreating PostgreSQL database..."
+    local database="$1"
+
+    echo "==> Recreating database '${database}'..."
 
     PGPASSWORD="${POSTGRES_PASSWORD}" \
     psql \
@@ -315,30 +330,33 @@ recreate_database() {
         -d postgres <<EOF
 SELECT pg_terminate_backend(pid)
 FROM pg_stat_activity
-WHERE datname = '${POSTGRES_DB}'
+WHERE datname = '${database}'
   AND pid <> pg_backend_pid();
 
-DROP DATABASE IF EXISTS ${POSTGRES_DB};
+DROP DATABASE IF EXISTS ${database};
 
-CREATE DATABASE ${POSTGRES_DB};
+CREATE DATABASE ${database};
 EOF
 
-    echo "Database recreated."
+    echo "Database '${database}' recreated."
     echo
 }
 
 restore_database() {
-    echo "==> Restoring PostgreSQL database..."
+    local database="$1"
+    local dump_file="$2"
+
+    echo "==> Restoring database '${database}'..."
 
     PGPASSWORD="${POSTGRES_PASSWORD}" \
     pg_restore \
         -h "${POSTGRES_HOST}" \
         -p "${POSTGRES_PORT}" \
         -U "${POSTGRES_USER}" \
-        -d "${POSTGRES_DB}" \
-        "${BACKUP_DIR}/postgres.dump"
+        -d "${database}" \
+        "${dump_file}"
 
-    echo "PostgreSQL database restored."
+    echo "Database '${database}' restored."
     echo
 }
 
@@ -361,7 +379,7 @@ restore_envs() {
     shopt -s nullglob
 
     for env_file in "${BACKUP_DIR}/env/"*.env; do
-    # Use the backup filename as the service name.
+        # Use the backup filename as the service name.
         service_name=$(basename "${env_file}" .env)
 
         cp "${env_file}" "${COMPOSE_DIR}/${service_name}/.env"
@@ -381,6 +399,7 @@ restore_certs() {
 
     # Remove current certs.
     rm -rf "${CERTS_DIR}"
+    mkdir -p "${CERTS_DIR}"
 
     # Restore certs from the backup.
     cp -a "${BACKUP_DIR}/certs/." "${CERTS_DIR}/"

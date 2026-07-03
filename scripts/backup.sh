@@ -68,20 +68,43 @@ backup_postgres() {
     echo "==> Backing up PostgreSQL..."
 
     # Export all variables from the PostgreSQL .env file
-    # so pg_dump can access them.
+    # so PostgreSQL tools can access them.
     set -a
     source "${POSTGRES_ENV}"
     set +a
 
-    PGPASSWORD="${POSTGRES_PASSWORD}" \
-    pg_dump \
-        -h "${POSTGRES_HOST}" \
-        -p "${POSTGRES_PORT}" \
-        -U "${POSTGRES_USER}" \
-        -Fc \
-        "${POSTGRES_DB}" \
-        -f "${BACKUP_DIR}/postgres.dump"
+    mkdir -p "${BACKUP_DIR}/postgres"
 
+    # Get all user databases.
+    mapfile -t databases < <(
+        PGPASSWORD="${POSTGRES_PASSWORD}" \
+        psql \
+            -h "${POSTGRES_HOST}" \
+            -p "${POSTGRES_PORT}" \
+            -U "${POSTGRES_USER}" \
+            -d postgres \
+            -At \
+            -c "SELECT datname
+                FROM pg_database
+                WHERE datistemplate = false
+                  AND datname <> 'postgres';"
+    )
+
+    # Create one dump per database.
+    for database in "${databases[@]}"; do
+        echo "  ✓ ${database}"
+
+        PGPASSWORD="${POSTGRES_PASSWORD}" \
+        pg_dump \
+            -h "${POSTGRES_HOST}" \
+            -p "${POSTGRES_PORT}" \
+            -U "${POSTGRES_USER}" \
+            -Fc \
+            "${database}" \
+            -f "${BACKUP_DIR}/postgres/${database}.dump"
+    done
+
+    echo
     echo "PostgreSQL backup completed."
     echo
 }
@@ -147,11 +170,13 @@ verify_backup() {
         ((errors++))
     fi
 
-    # Verify PostgreSQL dump.
-    if [[ -s "${BACKUP_DIR}/postgres.dump" ]]; then
-        echo "  ✓ PostgreSQL dump"
+    # Verify PostgreSQL dumps.
+    if compgen -G "${BACKUP_DIR}/postgres/*.dump" > /dev/null; then
+        for dump_file in "${BACKUP_DIR}"/postgres/*.dump; do
+            echo "  ✓ $(basename "${dump_file}")"
+        done
     else
-        echo "  ✗ PostgreSQL dump missing"
+        echo "  ✗ No PostgreSQL dumps found"
         ((errors++))
     fi
 
