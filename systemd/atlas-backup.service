@@ -1,0 +1,11 @@
+[Unit]
+Description=Atlas Backup
+Documentation=https://github.com/LanceDevHub/atlas
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=lenny
+Group=lenny
+ExecStart=/opt/atlas/scripts/backup.sh
