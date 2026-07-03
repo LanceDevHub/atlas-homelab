@@ -60,6 +60,7 @@ services:
       # HTTPS only
       - "traefik.http.routers.traefik.entrypoints=websecure"
       - "traefik.http.routers.traefik.tls=true"
+      - "traefik.http.routers.traefik.middlewares=security-headers@file"
 
       # Use Traefik's internal API service
       - "traefik.http.routers.traefik.service=api@internal"

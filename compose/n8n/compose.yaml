@@ -22,6 +22,7 @@ services:
       # Accept HTTPS traffic only
       - "traefik.http.routers.n8n.entrypoints=websecure"
       - "traefik.http.routers.n8n.tls=true"
+      - "traefik.http.routers.n8n.middlewares=security-headers@file"
 
       # Internal port exposed by the container
       - "traefik.http.services.n8n.loadbalancer.server.port=5678"

@@ -5,3 +5,21 @@ tls:
   certificates:
     - certFile: /certs/atlas.crt
       keyFile: /certs/atlas.key
+
+
+http:
+  middlewares:
+    security-headers:
+      headers:
+        # Enforce HTTPS for future requests
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+
+        # Prevent MIME type sniffing
+        contentTypeNosniff: true
+
+        # Protect against clickjacking
+        frameDeny: true
+
+        # Limit referrer information
+        referrerPolicy: "strict-origin-when-cross-origin"
