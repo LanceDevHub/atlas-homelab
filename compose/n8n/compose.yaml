@@ -4,28 +4,34 @@ services:
 
     restart: unless-stopped
 
+    # Load environment variables from .env
     env_file:
       - .env
 
+    # Persist n8n configuration and workflows
     volumes:
       - /opt/atlas/data/n8n:/home/node/.n8n
 
+    # Publish n8n through Traefik
     labels:
       - "traefik.enable=true"
 
+      # Route requests for the configured hostname
       - "traefik.http.routers.n8n.rule=Host(`${N8N_HOST}`)"
+
+      # Accept HTTPS traffic only
       - "traefik.http.routers.n8n.entrypoints=websecure"
       - "traefik.http.routers.n8n.tls=true"
 
+      # Internal port exposed by the container
       - "traefik.http.services.n8n.loadbalancer.server.port=5678"
 
+      # Docker network used by Traefik
       - "traefik.docker.network=atlas-network"
 
     networks:
       - atlas-network
 
-
 networks:
   atlas-network:
     external: true
-

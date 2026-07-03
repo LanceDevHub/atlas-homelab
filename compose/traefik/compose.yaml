@@ -4,47 +4,64 @@ services:
 
     restart: unless-stopped
 
+    # Load environment variables from .env
     env_file:
       - .env
 
     command:
+      # Discover Docker containers automatically
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.network=atlas-network"
 
+      # Load dynamic configuration (TLS certificates, middleware, ...)
       - "--providers.file.directory=/config"
       - "--providers.file.watch=true"
 
+      # HTTP entry point
       - "--entrypoints.web.address=:80"
 
+      # Redirect all HTTP traffic to HTTPS
       - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
       - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
 
+      # HTTPS entry point
       - "--entrypoints.websecure.address=:443"
 
+      # Enable Traefik API and dashboard
       - "--api=true"
       - "--api.dashboard=true"
 
+      # Logging
       - "--log.level=INFO"
 
+    # Expose Traefik to the host
     ports:
       - "80:80"
       - "443:443"
 
     volumes:
+      # Read Docker metadata
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
+      # TLS certificates
       - /opt/atlas/certs:/certs:ro
 
+      # Dynamic Traefik configuration
       - /opt/atlas/compose/traefik/config:/config:ro
 
+    # Publish the Traefik dashboard
     labels:
       - "traefik.enable=true"
 
+      # Dashboard hostname
       - "traefik.http.routers.traefik.rule=Host(`${TRAEFIK_HOST}`)"
+
+      # HTTPS only
       - "traefik.http.routers.traefik.entrypoints=websecure"
       - "traefik.http.routers.traefik.tls=true"
 
+      # Use Traefik's internal API service
       - "traefik.http.routers.traefik.service=api@internal"
 
     networks:

@@ -4,12 +4,15 @@ services:
 
     restart: unless-stopped
 
+    # Load environment variables from .env
     env_file:
       - .env
 
+    # Persist database files
     volumes:
       - /opt/atlas/data/postgres:/var/lib/postgresql/data
 
+    # Expose PostgreSQL for administration (e.g. DBeaver)
     ports:
       - "5432:5432"
 

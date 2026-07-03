@@ -1,3 +1,6 @@
+# TLS certificate used for HTTPS connections.
+# The certificate and private key are mounted into /certs.
+
 tls:
   certificates:
     - certFile: /certs/atlas.crt
