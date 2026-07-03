@@ -2,7 +2,9 @@
 
 Dieses Dokument beschreibt die grundlegende Architektur der Atlas-Plattform.
 
-Es definiert die Prinzipien, Komponenten und Strukturen, nach denen Infrastruktur und zukünftige Projekte aufgebaut werden.
+Es definiert die übergeordneten Prinzipien, Komponenten und Strukturen, nach denen Atlas entwickelt und erweitert wird.
+
+Detaillierte Entscheidungen zu einzelnen Themen wie Backup, Sicherheit oder Netzwerk befinden sich in separaten Architekturdokumenten.
 
 Ziel ist eine reproduzierbare, modulare, sichere und langfristig wartbare Entwicklungsplattform.
 
@@ -10,15 +12,37 @@ Ziel ist eine reproduzierbare, modulare, sichere und langfristig wartbare Entwic
 
 # Architekturprinzipien
 
-Atlas basiert auf folgenden Grundprinzipien:
+Atlas basiert auf folgenden Grundprinzipien.
 
 - Trennung von Infrastruktur und Projekten
 - Containerisierung aller Dienste
-- Reproduzierbare Konfigurationen
+- Lose gekoppelte Komponenten
 - Klare Verantwortlichkeiten
+- Reproduzierbare Konfigurationen
 - Zentrale Dokumentation
 - Modulare Erweiterbarkeit
-- Zentrale Sicherheitsfunktionen
+- Security by Default
+- Automatisierung statt manueller Prozesse
+
+---
+
+# Verantwortlichkeiten
+
+Atlas verfolgt konsequent das Prinzip der Single Responsibility.
+
+Jede Komponente besitzt genau eine klar definierte Aufgabe und kennt keine internen Details anderer Komponenten.
+
+Beispiele:
+
+| Komponente | Verantwortung |
+|------------|---------------|
+| Traefik | Routing, HTTPS und Reverse Proxy |
+| PostgreSQL | Persistente Datenspeicherung |
+| n8n | Workflow- und Automatisierungsplattform |
+| Backup Engine | Erstellung und Verifikation von Backups |
+| Event System | Bereitstellung von Ereignissen für Automatisierungen |
+
+Dadurch bleiben Komponenten unabhängig voneinander austauschbar und können getrennt weiterentwickelt werden.
 
 ---
 
@@ -47,32 +71,30 @@ Atlas besteht aus mehreren logisch getrennten Ebenen.
         ┌──────────────┴──────────────┐
         │                             │
    PostgreSQL                      n8n
-        │
-        ▼
-/opt/atlas/data/postgres
 ```
 
-Alle Infrastruktur-Dienste kommunizieren über das gemeinsame Docker-Netzwerk `atlas-network` und können dadurch unabhängig voneinander betrieben werden.
+Alle Infrastruktur-Dienste kommunizieren ausschließlich über das gemeinsame Docker-Netzwerk `atlas-network`.
 
-Traefik bildet den zentralen Einstiegspunkt für sämtliche Webanwendungen der Plattform und übernimmt Routing, HTTPS sowie weitere Sicherheitsfunktionen.
+Traefik bildet den zentralen Einstiegspunkt für sämtliche Webanwendungen der Plattform.
 
 ---
 
 # Infrastruktur
 
-Infrastruktur-Dienste stellen gemeinsam genutzte Funktionen für mehrere Anwendungen bereit.
+Die Infrastruktur stellt gemeinsam genutzte Dienste für sämtliche Projekte bereit.
 
-Aktuelle Dienste:
+Aktuelle Infrastruktur-Dienste:
 
 - Traefik
 - PostgreSQL
 - n8n
 
-Geplante Dienste:
+Geplante Infrastruktur-Dienste:
 
 - Redis
 - Monitoring
 - Backup
+- Event-System
 
 Jeder Infrastruktur-Dienst besitzt:
 
@@ -123,7 +145,7 @@ Die Infrastruktur verwendet unter `/opt/atlas` eine einheitliche Verzeichnisstru
 
 # Architekturstandards
 
-Für alle Infrastruktur-Dienste gelten folgende Standards.
+Für alle Infrastruktur-Komponenten gelten gemeinsame Standards.
 
 ## Docker Compose
 
@@ -142,75 +164,35 @@ compose/
 
 Container bleiben zustandslos.
 
-Persistente Daten werden ausschließlich unter
+Persistente Daten werden ausschließlich außerhalb der Container gespeichert.
 
 ```text
 /opt/atlas/data/<service>
 ```
 
-gespeichert.
-
 ---
 
-## Netzwerke
+## Netzwerk
 
-Alle Infrastruktur-Dienste werden über das gemeinsame Docker-Netzwerk
+Alle Dienste kommunizieren ausschließlich über das gemeinsame Docker-Netzwerk.
 
 ```text
 atlas-network
 ```
 
-verbunden.
+Innerhalb der Plattform werden ausschließlich Docker-Service-Namen verwendet.
 
-Dadurch können sich Dienste über ihre Docker-Service-Namen erreichen.
-
-Beispiel:
-
-```text
-postgres
-n8n
-traefik
-redis
-```
-
-IP-Adressen werden innerhalb der Plattform nicht verwendet.
+IP-Adressen werden nicht verwendet.
 
 ---
 
 ## Reverse Proxy
 
-Traefik ist der zentrale Reverse Proxy der Atlas-Plattform.
+Traefik stellt den zentralen Einstiegspunkt der Plattform dar.
 
-Alle Webanwendungen werden ausschließlich über Traefik veröffentlicht.
+Nur Traefik veröffentlicht HTTP- und HTTPS-Ports auf dem Hostsystem.
 
-Nur Traefik veröffentlicht Ports auf dem Hostsystem.
-
-Alle übrigen Dienste kommunizieren ausschließlich über das gemeinsame Docker-Netzwerk und veröffentlichen keine eigenen HTTP- oder HTTPS-Ports.
-
-Traefik übernimmt zusätzlich:
-
-- TLS-Terminierung
-- HTTP-zu-HTTPS-Weiterleitungen
-- HTTP Security Header
-- Routing anhand des Hostnamens
-
----
-
-## HTTPS
-
-HTTPS wird zentral durch Traefik bereitgestellt.
-
-Backend-Dienste kommunizieren weiterhin unverschlüsselt innerhalb des isolierten Docker-Netzwerks.
-
-TLS-Zertifikate werden zentral unter
-
-```text
-/opt/atlas/certs
-```
-
-verwaltet.
-
-Dadurch müssen einzelne Dienste keine eigene HTTPS-Konfiguration besitzen.
+Alle übrigen Dienste kommunizieren ausschließlich intern über das Docker-Netzwerk.
 
 ---
 
@@ -218,7 +200,22 @@ Dadurch müssen einzelne Dienste keine eigene HTTPS-Konfiguration besitzen.
 
 Konfigurationswerte werden über `.env`-Dateien verwaltet.
 
-Dadurch bleiben Compose-Dateien unabhängig von sensiblen Informationen und können problemlos versioniert werden.
+Dadurch bleiben Compose-Dateien unabhängig von vertraulichen Informationen und können versioniert werden.
+
+---
+
+# Architekturdomänen
+
+Die Gesamtarchitektur wird in mehrere eigenständige Themenbereiche unterteilt.
+
+| Dokument | Inhalt |
+|----------|--------|
+| architecture.md | Gesamtarchitektur |
+| backup-strategy.md | Backup und Disaster Recovery |
+| networking.md | Netzwerkarchitektur |
+| security.md | Sicherheitsarchitektur |
+| storage.md | Datenhaltung |
+| event-system.md | Ereignisse und Automatisierung |
 
 ---
 
@@ -226,7 +223,7 @@ Dadurch bleiben Compose-Dateien unabhängig von sensiblen Informationen und kön
 
 Atlas ist modular aufgebaut.
 
-Neue Infrastruktur-Dienste können unabhängig ergänzt werden, ohne bestehende Komponenten anzupassen.
+Neue Infrastruktur-Dienste können ergänzt werden, ohne bestehende Komponenten anpassen zu müssen.
 
 Neue Projekte bauen auf der bestehenden Infrastruktur auf und folgen denselben Architekturstandards.
 
@@ -234,12 +231,14 @@ Neue Projekte bauen auf der bestehenden Infrastruktur auf und folgen denselben A
 
 # Architekturziele
 
-Die Architektur verfolgt folgende Ziele:
+Die Architektur verfolgt folgende Ziele.
 
 - reproduzierbare Infrastruktur
 - modulare Erweiterbarkeit
-- einfache Wartbarkeit
+- lose gekoppelte Komponenten
 - klare Verantwortlichkeiten
+- einfache Wartbarkeit
 - zentrale Sicherheitsfunktionen
+- hohe Automatisierbarkeit
 - saubere Dokumentation
 - langfristige Skalierbarkeit
