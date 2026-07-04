@@ -45,6 +45,16 @@ readonly DAILY_RETENTION=7
 # Functions
 # ==================================================
 
+cleanup_failed_backup() {
+    echo
+    echo "Backup failed."
+    echo "Removing incomplete backup..."
+
+    rm -rf "${BACKUP_DIR}"
+
+    echo "Incomplete backup removed."
+}
+
 create_backup_directory() {
     echo "==> Creating backup directory..."
 
@@ -70,15 +80,12 @@ EOF
 backup_postgres() {
     echo "==> Backing up PostgreSQL..."
 
-    # Export all variables from the PostgreSQL .env file
-    # so PostgreSQL tools can access them.
     set -a
     source "${POSTGRES_ENV}"
     set +a
 
     mkdir -p "${BACKUP_DIR}/postgres"
 
-    # Get all user databases.
     mapfile -t databases < <(
         PGPASSWORD="${POSTGRES_PASSWORD}" \
         psql \
@@ -93,7 +100,6 @@ backup_postgres() {
                   AND datname <> 'postgres';"
     )
 
-    # Create one dump per database.
     for database in "${databases[@]}"; do
         echo "  ✓ ${database}"
 
@@ -116,9 +122,6 @@ backup_n8n() {
     echo "==> Backing up n8n data..."
 
     mkdir -p "${BACKUP_DIR}/data"
-
-    # Archive mode preserves permissions,
-    # timestamps and symbolic links.
     cp -a "${DATA_DIR}/n8n" "${BACKUP_DIR}/data/"
 
     echo "n8n backup completed."
@@ -130,18 +133,14 @@ backup_env() {
 
     mkdir -p "${BACKUP_DIR}/env"
 
-    # Ignore the pattern if no .env files exist.
     shopt -s nullglob
 
     for env_file in "${COMPOSE_DIR}"/*/.env; do
         service_name=$(basename "$(dirname "${env_file}")")
-
         cp "${env_file}" "${BACKUP_DIR}/env/${service_name}.env"
-
         echo "  ✓ ${service_name}.env"
     done
 
-    # Restore default shell behavior.
     shopt -u nullglob
 
     echo
@@ -152,8 +151,6 @@ backup_env() {
 backup_certs() {
     echo "==> Backing up TLS certificates..."
 
-    # Archive mode preserves permissions,
-    # timestamps and symbolic links.
     cp -a "${CERTS_DIR}" "${BACKUP_DIR}/"
 
     echo "TLS certificates backup completed."
@@ -165,7 +162,6 @@ verify_backup() {
 
     local errors=0
 
-    # Verify backup metadata.
     if [[ -f "${BACKUP_DIR}/backup.info" ]]; then
         echo "  ✓ backup.info"
     else
@@ -173,7 +169,6 @@ verify_backup() {
         ((errors++))
     fi
 
-    # Verify PostgreSQL dumps.
     if compgen -G "${BACKUP_DIR}/postgres/*.dump" > /dev/null; then
         for dump_file in "${BACKUP_DIR}"/postgres/*.dump; do
             echo "  ✓ $(basename "${dump_file}")"
@@ -183,7 +178,6 @@ verify_backup() {
         ((errors++))
     fi
 
-    # Verify n8n data.
     if [[ -d "${BACKUP_DIR}/data/n8n" ]]; then
         echo "  ✓ n8n data"
     else
@@ -191,7 +185,6 @@ verify_backup() {
         ((errors++))
     fi
 
-    # Verify environment files.
     for service in "${REQUIRED_ENV_FILES[@]}"; do
         if [[ -f "${BACKUP_DIR}/env/${service}.env" ]]; then
             echo "  ✓ ${service}.env"
@@ -201,7 +194,6 @@ verify_backup() {
         fi
     done
 
-    # Verify TLS certificates.
     for file in "${REQUIRED_CERT_FILES[@]}"; do
         if [[ -f "${BACKUP_DIR}/certs/${file}" ]]; then
             echo "  ✓ ${file}"
@@ -215,9 +207,7 @@ verify_backup() {
 
     if (( errors > 0 )); then
         echo "Backup verification failed."
-
-        # Abort immediately if the backup is incomplete.
-        exit 1
+        return 1
     fi
 
     echo "Backup verification successful."
@@ -228,10 +218,7 @@ rotate_backups() {
     echo "==> Rotating backups..."
 
     mapfile -t backups < <(
-        find "${BACKUP_ROOT}" \
-            -mindepth 1 \
-            -maxdepth 1 \
-            -type d | sort
+        find "${BACKUP_ROOT}" -mindepth 1 -maxdepth 1 -type d | sort
     )
 
     local backup_count=${#backups[@]}
@@ -247,7 +234,6 @@ rotate_backups() {
     for ((i=0; i<backups_to_delete; i++)); do
         echo "Deleting backup:"
         echo "  $(basename "${backups[i]}")"
-
         rm -rf "${backups[i]}"
     done
 
@@ -257,29 +243,26 @@ rotate_backups() {
 }
 
 main() {
+    trap cleanup_failed_backup ERR
+
     echo
     echo "======================================="
     echo " Atlas Backup"
     echo "======================================="
     echo
 
-    # Create backup directory
     create_backup_directory
-
-    # Create backup metadata.
     create_backup_info
 
-    # Backup application data.
     backup_postgres
     backup_n8n
     backup_env
     backup_certs
 
-    # Verify backup integrity.
     verify_backup
-
-    # Remove backups exceeding the retention limit.
     rotate_backups
+
+    trap - ERR
 
     echo "======================================="
     echo " Backup completed successfully."
