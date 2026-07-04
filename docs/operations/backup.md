@@ -18,6 +18,8 @@ Das Backup erstellt eine vollständige Sicherung aller nicht rekonstruierbaren L
 
 Nach erfolgreichem Abschluss kann die Plattform mithilfe von `restore.sh` vollständig wiederhergestellt werden.
 
+Während des gesamten Backup-Prozesses werden Ereignisse über das Event-System erzeugt, sodass externe Systeme (z. B. n8n) den Ablauf verfolgen können.
+
 ---
 
 # Voraussetzungen
@@ -36,36 +38,61 @@ Vor dem Backup müssen folgende Voraussetzungen erfüllt sein.
 Das Backup besteht aus mehreren aufeinanderfolgenden Schritten.
 
 ```text
-Backup starten
+backup.started
+
         │
         ▼
+
 Backup-Verzeichnis erstellen
+
         │
         ▼
+
 backup.info erzeugen
+
         │
         ▼
+
 PostgreSQL sichern
+
         │
         ▼
+
 n8n-Daten sichern
+
         │
         ▼
+
 .env-Dateien sichern
+
         │
         ▼
+
 TLS-Zertifikate sichern
+
         │
         ▼
+
 Backup verifizieren
+
         │
         ▼
-Backup abgeschlossen
+
+Backup-Rotation
+
+        │
+        ▼
+
+backup.completed
 ```
 
 Jeder Schritt muss erfolgreich abgeschlossen werden.
 
-Bei einem Fehler wird das Backup sofort beendet.
+Tritt während eines Schrittes ein Fehler auf, wird
+
+- ein `backup.failed`-Event erzeugt,
+- das unvollständige Backup entfernt und
+- das Skript sofort beendet.
 
 ---
 
@@ -121,7 +148,11 @@ Zusätzlich zur Datenbank werden die lokalen n8n-Daten gesichert.
 /opt/atlas/data/n8n
 ```
 
-Die Sicherung erfolgt inklusive Berechtigungen und Zeitstempeln.
+Die Sicherung erfolgt inklusive
+
+- Berechtigungen
+- Zeitstempeln
+- symbolischen Links
 
 ---
 
@@ -138,7 +169,7 @@ compose/
 └── traefik/.env
 ```
 
-Im Backup werden sie gespeichert als:
+Im Backup werden sie gespeichert als
 
 ```text
 env/
@@ -157,7 +188,7 @@ Die vollständige Zertifikatsstruktur wird übernommen.
 certs/
 ```
 
-Hierzu gehören beispielsweise:
+Hierzu gehören beispielsweise
 
 - atlas.key
 - atlas.crt
@@ -203,6 +234,46 @@ Erst wenn alle Prüfungen erfolgreich sind, gilt das Backup als vollständig.
 
 ---
 
+# Backup-Rotation
+
+Nach erfolgreicher Verifikation werden alte Backups automatisch entfernt.
+
+Es werden maximal
+
+```text
+DAILY_RETENTION
+```
+
+Backups aufbewahrt.
+
+Ältere Sicherungen werden automatisch gelöscht.
+
+---
+
+# Event-System
+
+Während des Backup-Prozesses werden Ereignisse erzeugt.
+
+Folgende Ereignisse werden aktuell verwendet.
+
+| Ereignis | Beschreibung |
+|----------|--------------|
+| `backup.started` | Backup wurde gestartet |
+| `backup.completed` | Backup erfolgreich abgeschlossen |
+| `backup.failed` | Backup wurde aufgrund eines Fehlers beendet |
+
+Bei einem Fehler enthält der Payload zusätzlich den fehlgeschlagenen Verarbeitungsschritt.
+
+Beispiel:
+
+```json
+{
+    "step": "backup_postgres"
+}
+```
+
+---
+
 # Backup ausführen
 
 Das Backup wird über das Skript gestartet.
@@ -229,7 +300,57 @@ set -Eeuo pipefail
 
 Dadurch wird das Backup bei jedem Fehler sofort beendet.
 
-Unvollständige Backups werden nicht als erfolgreich betrachtet.
+Vor jedem kritischen Verarbeitungsschritt werden mögliche Fehler überprüft.
+
+Bei einem Fehler
+
+- wird ein `backup.failed`-Event erzeugt,
+- das unvollständige Backup entfernt,
+- der Fehler an den Benutzer ausgegeben und
+- das Skript beendet.
+
+Dadurch verbleiben niemals unvollständige Backups im Backup-Verzeichnis.
+
+---
+
+# Architekturentscheidungen
+
+Atlas trifft folgende Architekturentscheidungen.
+
+- Alle Backups werden vollständig verifiziert.
+- Unvollständige Backups werden automatisch entfernt.
+- Backup-Ereignisse werden über das Event-System veröffentlicht.
+- PostgreSQL-Datenbanken werden automatisch erkannt.
+- Alte Backups werden automatisch rotiert.
+- Das Backup enthält ausschließlich nicht rekonstruierbare Daten.
+
+---
+
+# Status
+
+## Architektur
+
+✅ Backup-Prozess definiert
+
+✅ Backup-Format definiert
+
+✅ Backup-Verifikation definiert
+
+## Implementierung
+
+✅ PostgreSQL-Backup
+
+✅ n8n-Backup
+
+✅ Konfigurations-Backup
+
+✅ Zertifikats-Backup
+
+✅ Backup-Verifikation
+
+✅ Backup-Rotation
+
+✅ Event-System integriert
 
 ---
 
@@ -239,5 +360,5 @@ Nach erfolgreichem Erstellen eines Backups kann dieses
 
 - lokal gespeichert,
 - auf ein externes System übertragen,
-- automatisiert archiviert oder
+- automatisiert verarbeitet oder
 - mit `restore.sh` wiederhergestellt werden.

@@ -29,6 +29,8 @@ Stattdessen erzeugen sie Ereignisse (Events), welche anschließend von der zentr
 
 Dadurch besitzt jede Komponente genau eine Aufgabe.
 
+Alle Infrastruktur-Komponenten erzeugen ihre Ereignisse über die gemeinsame Event-Bibliothek (`event_emit()`), wodurch alle Events automatisch dasselbe Format besitzen.
+
 Beispiel:
 
 ```text
@@ -36,11 +38,15 @@ Backup Engine
 
 ↓
 
-Backup erfolgreich
+backup.completed
 
 ↓
 
-Event
+Event Library
+
+↓
+
+JSON Event
 
 ↓
 
@@ -57,7 +63,7 @@ Die Backup Engine kennt weder Discord noch andere Benachrichtigungssysteme.
 
 # Architektur
 
-Das Event-System besteht aus drei Ebenen.
+Das Event-System besteht aus vier Ebenen.
 
 ```text
                     Infrastruktur
@@ -65,21 +71,25 @@ Das Event-System besteht aus drei Ebenen.
       ┌────────┬─────────┬──────────┬────────────┐
       │        │         │          │            │
  Backup  Restore  Transfer  Monitoring  Deployments
-      │        │         │          │            │
-      └────────┴─────────┴──────────┴────────────┘
-                       │
-                       ▼
-                  Event-System
-                       │
-                       ▼
-                      n8n
-         ┌─────────────┼─────────────┐
-         │             │             │
-         ▼             ▼             ▼
-      Discord       E-Mail     Weitere Workflows
+      │        │         │          │
+      └────────┴─────────┴──────────┘
+                 │
+                 ▼
+            Event Library
+          (event_emit())
+                 │
+                 ▼
+            JSON Event Files
+                 │
+                 ▼
+                n8n
+      ┌──────────┼──────────┐
+      │          │          │
+      ▼          ▼          ▼
+   Discord     E-Mail   Weitere Workflows
 ```
 
-Alle Infrastruktur-Komponenten kommunizieren ausschließlich mit dem Event-System.
+Alle Infrastruktur-Komponenten kommunizieren ausschließlich über die Event Library.
 
 Die eigentliche Automatisierung erfolgt vollständig innerhalb von n8n.
 
@@ -93,15 +103,36 @@ Die Infrastruktur erzeugt ausschließlich Ereignisse.
 
 Beispiele:
 
+- Backup gestartet
 - Backup abgeschlossen
-- Restore abgeschlossen
-- Backup übertragen
 - Backup fehlgeschlagen
-- Monitoring-Warnung
-- Deployment abgeschlossen
-- Zertifikat erneuert
+- Restore gestartet
+- Restore abgeschlossen
+- Restore fehlgeschlagen
+- Backup übertragen
+- Backup-Übertragung fehlgeschlagen
 
 Die Infrastruktur entscheidet nicht, wie auf ein Ereignis reagiert wird.
+
+---
+
+## Event Library
+
+Die Event Library stellt eine gemeinsame API zur Erzeugung von Ereignissen bereit.
+
+Aktuell besteht sie aus folgenden Funktionen:
+
+- `event_emit()`
+- `event_payload()`
+
+Sie übernimmt unter anderem:
+
+- Erzeugung des Zeitstempels
+- Dateinamen
+- JSON-Formatierung
+- Schreiben der Event-Datei
+
+Dadurch müssen Infrastruktur-Komponenten keine JSON-Dateien selbst erzeugen.
 
 ---
 
@@ -111,11 +142,11 @@ Das Event-System dient als standardisierte Schnittstelle zwischen Infrastruktur 
 
 Es beschreibt:
 
-- Art des Ereignisses
+- Ereignistyp
 - Zeitpunkt
 - Quelle
 - Status
-- zusätzliche Informationen
+- Payload
 
 Das Event-System besitzt keine Logik zur Verarbeitung der Ereignisse.
 
@@ -146,35 +177,15 @@ backup.sh
 
 ↓
 
-Backup erfolgreich
+event_emit()
 
 ↓
 
-Event
+backup.completed
 
 ↓
 
-n8n
-
-↓
-
-Discord
-```
-
----
-
-## Erfolgreiche Backup-Übertragung
-
-```text
-backup-transfer.sh
-
-↓
-
-Backup übertragen
-
-↓
-
-Event
+JSON Event
 
 ↓
 
@@ -183,34 +194,6 @@ n8n
 ↓
 
 Discord
-```
-
----
-
-## Backup-Ziel nicht erreichbar
-
-```text
-backup-transfer.sh
-
-↓
-
-Backup-Ziel nicht erreichbar
-
-↓
-
-Event
-
-↓
-
-n8n
-
-↓
-
-Discord
-
-↓
-
-Erneuter Übertragungsversuch
 ```
 
 ---
@@ -222,11 +205,15 @@ backup.sh
 
 ↓
 
-PostgreSQL-Backup fehlgeschlagen
+event_emit()
 
 ↓
 
-Event
+backup.failed
+
+↓
+
+JSON Event
 
 ↓
 
@@ -239,6 +226,54 @@ Discord
 
 ---
 
+## Erfolgreicher Restore
+
+```text
+restore.sh
+
+↓
+
+event_emit()
+
+↓
+
+restore.completed
+
+↓
+
+JSON Event
+
+↓
+
+n8n
+```
+
+---
+
+## Erfolgreiche Backup-Übertragung
+
+```text
+backup-transfer.sh
+
+↓
+
+event_emit()
+
+↓
+
+transfer.completed
+
+↓
+
+JSON Event
+
+↓
+
+n8n
+```
+
+---
+
 ## Monitoring
 
 ```text
@@ -246,11 +281,11 @@ Monitoring
 
 ↓
 
-CPU-Auslastung kritisch
+system.disk.low
 
 ↓
 
-Event
+JSON Event
 
 ↓
 
@@ -265,40 +300,51 @@ Discord
 
 # Event-Typen
 
-Langfristig sollen unter anderem folgende Ereignisse unterstützt werden.
+Aktuell werden unter anderem folgende Ereignisse verwendet.
 
 ## Backup
 
-- Backup erfolgreich
-- Backup fehlgeschlagen
-- Backup übertragen
-- Backup-Ziel nicht erreichbar
+- backup.started
+- backup.completed
+- backup.failed
 
 ---
 
 ## Restore
 
-- Restore gestartet
-- Restore abgeschlossen
-- Restore fehlgeschlagen
+- restore.started
+- restore.completed
+- restore.failed
+
+---
+
+## Transfer
+
+- transfer.started
+- transfer.completed
+- transfer.failed
 
 ---
 
 ## Monitoring
 
-- Hohe CPU-Auslastung
-- Hohe RAM-Auslastung
-- Wenig Speicherplatz
-- Dienst nicht erreichbar
+Geplant:
+
+- system.cpu.high
+- system.memory.high
+- system.disk.low
+- service.unreachable
 
 ---
 
 ## Infrastruktur
 
-- Container gestartet
-- Container gestoppt
-- Deployment abgeschlossen
-- Zertifikat erneuert
+Geplant:
+
+- container.started
+- container.stopped
+- deployment.completed
+- certificate.renewed
 
 ---
 
@@ -326,7 +372,8 @@ Beispiele:
 Die Event-Architektur bietet mehrere Vorteile.
 
 - Lose gekoppelte Komponenten
-- Klare Verantwortlichkeiten
+- Einheitliches Event-Format
+- Gemeinsame Event Library
 - Hohe Erweiterbarkeit
 - Austauschbare Benachrichtigungssysteme
 - Zentrale Workflow-Verwaltung
@@ -340,9 +387,39 @@ Atlas trifft folgende Architekturentscheidungen.
 
 - Infrastruktur erzeugt ausschließlich Ereignisse.
 - Infrastruktur kennt keine externen Dienste.
+- Alle Komponenten verwenden die gemeinsame Event Library.
+- Ereignisse werden als JSON-Dateien erzeugt.
 - n8n verarbeitet sämtliche Ereignisse.
 - Benachrichtigungen erfolgen ausschließlich über n8n.
 - Neue Workflows können ergänzt werden, ohne bestehende Infrastruktur anzupassen.
+
+---
+
+# Status
+
+## Architektur
+
+✅ Event-System definiert
+
+✅ Event Library definiert
+
+✅ Event-Format definiert
+
+## Implementierung
+
+✅ Event Library implementiert
+
+✅ Backup integriert
+
+✅ Restore integriert
+
+✅ Transfer integriert
+
+⬜ n8n anbinden
+
+⬜ Monitoring integrieren
+
+⬜ Deployment Events integrieren
 
 ---
 
@@ -352,7 +429,6 @@ Das Event-System bildet die Grundlage für zukünftige Automatisierungen.
 
 Geplante Erweiterungen:
 
-- Backup-Rotation
 - Monitoring
 - Software-Updates
 - Deployment-Pipelines

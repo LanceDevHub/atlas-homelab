@@ -180,6 +180,8 @@ Sie erstellt:
 - TLS-Zertifikate
 - Backup-Metadaten
 
+Während der Ausführung erzeugt sie standardisierte Ereignisse über die Event Library.
+
 Die Backup Engine kennt keine externen Speicherziele.
 
 Die Übertragung auf externe Backup-Ziele erfolgt ausschließlich durch die Transfer Engine.
@@ -190,6 +192,8 @@ Die Übertragung auf externe Backup-Ziele erfolgt ausschließlich durch die Tran
 
 Die Transfer Engine übernimmt ausschließlich die Übertragung bereits vorhandener Backups auf externe Backup-Ziele.
 
+Während der Ausführung erzeugt sie ebenfalls standardisierte Ereignisse.
+
 Mögliche Ziele:
 
 - USB-Laufwerk
@@ -199,6 +203,18 @@ Mögliche Ziele:
 - Cloud-Speicher
 
 Dadurch bleiben Backup-Erstellung und Backup-Übertragung vollständig voneinander getrennt.
+
+---
+
+## Restore Engine
+
+Die Restore Engine stellt zuvor erzeugte Backups wieder her.
+
+Vor dem Restore wird das Backup validiert.
+
+Nach erfolgreicher Wiederherstellung wird der Systemzustand überprüft.
+
+Auch die Restore Engine erzeugt Ereignisse für das Event-System.
 
 ---
 
@@ -301,11 +317,13 @@ Geplante Erweiterungen:
 
 # Benachrichtigungen
 
-Die Backup Engine versendet keine Benachrichtigungen.
+Die Infrastruktur versendet keine Benachrichtigungen.
 
-Stattdessen erzeugt sie Ereignisse, die von der zentralen Workflow-Plattform verarbeitet werden.
+Backup-, Restore- und Transfer-Engine erzeugen ausschließlich standardisierte Ereignisse.
 
-Dadurch bleibt die Backup-Infrastruktur unabhängig von externen Diensten.
+Diese werden zunächst lokal gespeichert und später von der Workflow-Plattform verarbeitet.
+
+Dadurch bleibt die Infrastruktur vollständig von externen Diensten entkoppelt.
 
 Die konkrete Event-Architektur wird im Dokument
 
@@ -327,6 +345,7 @@ Atlas trifft folgende grundlegende Architekturentscheidungen.
 - Backups werden zunächst lokal erstellt.
 - Lokale Backups besitzen höhere Priorität als die externe Übertragung.
 - Backup-Erstellung und Backup-Übertragung sind voneinander getrennt.
+- Alle Infrastruktur-Komponenten erzeugen standardisierte Ereignisse.
 - Langfristige Speicherung erfolgt auf externen Systemen.
 - Wiederkehrende Backups werden automatisch über systemd ausgeführt.
 - Benachrichtigungen werden ausschließlich über das Event-System verarbeitet.
@@ -351,6 +370,8 @@ Atlas trifft folgende grundlegende Architekturentscheidungen.
 
 ✅ Transfer Engine implementiert
 
+✅ Event Library integriert
+
 ✅ Backup-Rotation implementiert
 
 ✅ Geplante Backups über systemd
@@ -359,9 +380,9 @@ Atlas trifft folgende grundlegende Architekturentscheidungen.
 
 ✅ Vollständigen Restore getestet
 
-⬜ Event-System integrieren
+⬜ Event Dispatcher implementieren
 
-⬜ Benachrichtigungen implementieren
+⬜ n8n anbinden
 
 ⬜ Weitere Backup-Ziele integrieren
 

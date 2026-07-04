@@ -30,6 +30,8 @@ Es beschreibt nicht, wie auf das Ereignis reagiert werden soll.
 
 Die Verarbeitung erfolgt ausschließlich durch das Event-System.
 
+Alle Infrastruktur-Komponenten erzeugen Events ausschließlich über die gemeinsame Event-Bibliothek (`event_emit()`), wodurch alle Ereignisse automatisch dasselbe Format verwenden.
+
 ---
 
 # Standardstruktur
@@ -42,7 +44,7 @@ Jedes Event besitzt folgenden Aufbau.
     "timestamp": "...",
     "source": "...",
     "status": "...",
-    "payload": { }
+    "payload": {}
 }
 ```
 
@@ -65,9 +67,9 @@ restore.started
 restore.completed
 restore.failed
 
-backup.transfer.started
-backup.transfer.completed
-backup.transfer.failed
+transfer.started
+transfer.completed
+transfer.failed
 
 system.disk.low
 container.started
@@ -79,7 +81,7 @@ container.started
 
 Zeitpunkt der Ereigniserzeugung.
 
-Verwendet wird das ISO-8601-Format.
+Verwendet wird das ISO-8601-Format (UTC).
 
 Beispiel:
 
@@ -98,7 +100,7 @@ Beispiele:
 ```text
 atlas-backup
 atlas-restore
-atlas-backup-transfer
+atlas-transfer
 monitoring
 traefik
 postgres
@@ -128,18 +130,43 @@ Enthält ereignisspezifische Informationen.
 
 Der Inhalt hängt vom jeweiligen Ereignis ab.
 
-Beispiel:
+Typische Beispiele:
 
 ```json
 {
-    "directory": "2026-07-04_03-00-00",
-    "size": "182 MB"
+    "directory": "2026-07-04_03-00-00"
 }
 ```
+
+```json
+{
+    "step": "backup_postgres"
+}
+```
+
+```json
+{}
+```
+
+Ein leeres Payload wird als leeres JSON-Objekt (`{}`) gespeichert.
 
 ---
 
 # Beispiele
+
+## Backup gestartet
+
+```json
+{
+    "event": "backup.started",
+    "timestamp": "2026-07-04T03:00:00Z",
+    "source": "atlas-backup",
+    "status": "info",
+    "payload": {}
+}
+```
+
+---
 
 ## Backup erfolgreich
 
@@ -166,7 +193,7 @@ Beispiel:
     "source": "atlas-backup",
     "status": "error",
     "payload": {
-        "reason": "PostgreSQL dump failed"
+        "step": "backup_postgres"
     }
 }
 ```
@@ -177,9 +204,9 @@ Beispiel:
 
 ```json
 {
-    "event": "backup.transfer.completed",
+    "event": "transfer.completed",
     "timestamp": "2026-07-04T03:15:42Z",
-    "source": "atlas-backup-transfer",
+    "source": "atlas-transfer",
     "status": "success",
     "payload": {
         "directory": "2026-07-04_03-00-00"
@@ -200,13 +227,17 @@ Event-Namen folgen dem Schema
 Beispiele:
 
 ```text
+backup.started
 backup.completed
 backup.failed
 
 restore.started
 restore.completed
+restore.failed
 
-backup.transfer.completed
+transfer.started
+transfer.completed
+transfer.failed
 
 container.started
 
@@ -238,9 +269,9 @@ Das Event-Format ist unabhängig vom verwendeten Transportweg.
 
 Beispiele:
 
-- JSON-Datei
+- JSON-Dateien
 - HTTP
-- Webhook
+- Webhooks
 - MQTT
 - Redis
 - RabbitMQ
@@ -266,7 +297,7 @@ Atlas trifft folgende Architekturentscheidungen.
 - Alle Ereignisse besitzen dieselbe Grundstruktur.
 - Ereignisse werden als JSON dargestellt.
 - Das Event-Format ist unabhängig vom Transportweg.
-- Infrastruktur-Komponenten erzeugen ausschließlich Events.
+- Infrastruktur-Komponenten erzeugen Events ausschließlich über die gemeinsame Event-Bibliothek.
 - Die Verarbeitung erfolgt außerhalb der Infrastruktur-Komponenten.
 
 ---
@@ -283,14 +314,14 @@ Atlas trifft folgende Architekturentscheidungen.
 
 ## Implementierung
 
-⬜ Event Library implementieren
+✅ Event Library implementiert
 
-⬜ Event Transport implementieren
+✅ Event Transport implementiert
 
-⬜ Backup Engine integrieren
+✅ Backup Engine integriert
 
-⬜ Restore Engine integrieren
+✅ Restore Engine integriert
 
-⬜ Transfer Engine integrieren
+✅ Transfer Engine integriert
 
-⬜ n8n anbinden
+⬜ n8n Workflow anbinden

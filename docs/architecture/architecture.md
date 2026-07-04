@@ -19,6 +19,7 @@ Atlas basiert auf folgenden Grundprinzipien.
 - Lose gekoppelte Komponenten
 - Klare Verantwortlichkeiten
 - Reproduzierbare Konfigurationen
+- Ereignisgesteuerte Kommunikation
 - Zentrale Dokumentation
 - Modulare Erweiterbarkeit
 - Security by Default
@@ -39,9 +40,11 @@ Jede Komponente besitzt genau eine klar definierte Aufgabe und kennt keine inter
 | n8n | Workflow- und Automatisierungsplattform |
 | Backup Engine | Erstellung und Verifikation von Backups |
 | Restore Engine | Wiederherstellung von Backups |
-| Transfer Engine | Übertragung lokaler Backups auf externe Backup-Ziele |
-| Event System | Bereitstellung von Ereignissen für Automatisierungen |
-| systemd | Automatische Ausführung geplanter Systemaufgaben |
+| Transfer Engine | Übertragung lokaler Backups |
+| Event Library | Erzeugen standardisierter Ereignisse |
+| Event Queue | Lokale Speicherung von Ereignissen |
+| Event Dispatcher | Übertragung der Ereignisse an Workflow-Systeme |
+| systemd | Zeitgesteuerte Ausführung von Infrastruktur-Aufgaben |
 
 Dadurch bleiben Komponenten unabhängig voneinander austauschbar und können getrennt weiterentwickelt werden.
 
@@ -52,33 +55,44 @@ Dadurch bleiben Komponenten unabhängig voneinander austauschbar und können get
 Atlas besteht aus mehreren logisch getrennten Ebenen.
 
 ```text
-                    Atlas
+                           Atlas
 
-                       │
+                             │
 
-              Raspberry Pi 5
+                    Raspberry Pi 5
 
-                       │
+                             │
 
-                Docker Engine
+                     Docker Engine
 
-                       │
+                             │
 
-                atlas-network
+                     atlas-network
 
-                    Traefik
-              (TLS Termination)
-                       │
-        ┌──────────────┴──────────────┐
-        │                             │
-   PostgreSQL                      n8n
+                          Traefik
+                    (TLS Termination)
+
+                             │
+          ┌──────────────────┴──────────────────┐
+          │                                     │
+     PostgreSQL                              n8n
+
+
+──────────────────────────────────────────────────────
+
+ Backup Engine
+ Restore Engine
+ Transfer Engine
+ Event Library
+ Event Queue
+ systemd
 ```
 
-Alle containerisierten Infrastruktur-Dienste kommunizieren ausschließlich über das gemeinsame Docker-Netzwerk `atlas-network`.
+Containerisierte Dienste kommunizieren ausschließlich über das gemeinsame Docker-Netzwerk `atlas-network`.
 
-Traefik bildet den zentralen Einstiegspunkt für sämtliche Webanwendungen der Plattform.
+Traefik bildet den zentralen Einstiegspunkt für sämtliche Webanwendungen.
 
-Zeitgesteuerte Aufgaben wie Backups, Backup-Übertragungen oder zukünftige Monitoring-Aufgaben werden unabhängig von den Containern über systemd ausgeführt.
+Zeitgesteuerte Aufgaben wie Backups, Restore, Backup-Übertragungen und zukünftige Monitoring-Aufgaben werden unabhängig von Docker über systemd ausgeführt.
 
 ---
 
@@ -97,21 +111,23 @@ Die Infrastruktur stellt gemeinsam genutzte Dienste und Plattformkomponenten fü
 - Backup Engine
 - Restore Engine
 - Transfer Engine
-- Event System
-- systemd-Automatisierung
+- Event Library
+- Event Queue
+- systemd
 
 ## Geplante Komponenten
 
-- Redis
+- Event Dispatcher
 - Monitoring
+- Redis
 
-Jede Infrastruktur-Komponente besitzt:
+Jede Infrastruktur-Komponente besitzt
 
 - eine klar definierte Verantwortung
 - eine eigene Dokumentation
 - eine reproduzierbare Konfiguration
 
-Containerisierte Dienste besitzen zusätzlich:
+Containerisierte Dienste besitzen zusätzlich
 
 - ein eigenes Compose-Projekt
 - ein eigenes Datenverzeichnis
@@ -122,7 +138,7 @@ Containerisierte Dienste besitzen zusätzlich:
 
 Projekte sind eigenständige Anwendungen, die auf der Infrastruktur aufbauen.
 
-Jedes Projekt besitzt:
+Jedes Projekt besitzt
 
 - ein eigenes Git-Repository
 - eine eigene Dokumentation
@@ -149,6 +165,7 @@ Die Infrastruktur verwendet unter `/opt/atlas` eine einheitliche Verzeichnisstru
 │   ├── postgres/
 │   └── n8n/
 ├── docs/
+├── events/
 ├── logs/
 ├── repositories/
 ├── scripts/
@@ -218,6 +235,16 @@ Dadurch bleiben Compose-Dateien unabhängig von vertraulichen Informationen und 
 
 ---
 
+## Ereignisse
+
+Alle Infrastruktur-Komponenten kommunizieren über standardisierte Ereignisse.
+
+Sie erzeugen ausschließlich Events und besitzen keine Kenntnis über nachgelagerte Workflows oder Benachrichtigungssysteme.
+
+Dadurch bleiben Infrastruktur und Automatisierung vollständig voneinander getrennt.
+
+---
+
 ## Automatisierung
 
 Wiederkehrende Infrastruktur-Aufgaben werden über systemd Services und Timer ausgeführt.
@@ -236,7 +263,9 @@ Die Gesamtarchitektur wird in mehrere eigenständige Themenbereiche unterteilt.
 |----------|--------|
 | architecture.md | Gesamtarchitektur |
 | backup-strategy.md | Backup- und Restore-Architektur |
-| event-system.md | Ereignisse und Automatisierung |
+| event-format.md | Event-Struktur |
+| event-system.md | Event-System |
+| event-transport.md | Event-Transport |
 
 Weitere Architekturdokumente können bei Bedarf ergänzt werden.
 
@@ -260,6 +289,7 @@ Die Architektur verfolgt folgende Ziele.
 - modulare Erweiterbarkeit
 - lose gekoppelte Komponenten
 - klare Verantwortlichkeiten
+- ereignisgesteuerte Kommunikation
 - einfache Wartbarkeit
 - zentrale Sicherheitsfunktionen
 - hohe Automatisierbarkeit

@@ -63,7 +63,7 @@ HOSTNAME=atlas
 
 ## BACKUP_VERSION
 
-Beschreibt das verwendete Backup-Format.
+Beschreibt die Version des Backup-Formats.
 
 Die Restore Engine überprüft, ob die Version unterstützt wird.
 
@@ -101,15 +101,9 @@ atlas
 
 # PostgreSQL
 
-Alle PostgreSQL-Datenbanken werden im Verzeichnis
+Alle Benutzerdatenbanken werden automatisch erkannt.
 
-```text
-postgres/
-```
-
-gespeichert.
-
-Für jede Datenbank existiert genau eine Dump-Datei.
+Für jede Datenbank wird genau eine Dump-Datei im PostgreSQL Custom Format erstellt.
 
 Beispiel:
 
@@ -121,6 +115,8 @@ postgres/
 ```
 
 Neue Datenbanken werden automatisch ergänzt.
+
+Dadurch muss das Backup-Skript bei neuen Anwendungen nicht angepasst werden.
 
 ---
 
@@ -141,7 +137,7 @@ data/
 └── n8n/
 ```
 
-Zukünftige Anwendungen können weitere Unterverzeichnisse hinzufügen.
+Weitere Anwendungen können zusätzliche Unterverzeichnisse ergänzen.
 
 ---
 
@@ -185,7 +181,7 @@ certs/
 └── atlas.cnf
 ```
 
-Die komplette Verzeichnisstruktur wird unverändert übernommen.
+Die komplette Zertifikatsstruktur wird unverändert übernommen.
 
 ---
 
@@ -194,10 +190,26 @@ Die komplette Verzeichnisstruktur wird unverändert übernommen.
 | Bestandteil | Format |
 |-------------|--------|
 | PostgreSQL | pg_dump Custom Format (`.dump`) |
-| Metadaten | Textdatei |
+| backup.info | Textdatei |
 | `.env` | Textdatei |
-| Zertifikate | Originaldateien |
+| TLS-Zertifikate | Originaldateien |
 | Anwendungsdaten | Originalverzeichnisse |
+
+---
+
+# Verifikation
+
+Nach der Erstellung wird jedes Backup automatisch überprüft.
+
+Dabei werden mindestens folgende Bestandteile kontrolliert:
+
+- `backup.info`
+- mindestens ein PostgreSQL-Dump
+- `data/n8n`
+- alle erforderlichen `.env`-Dateien
+- alle erforderlichen TLS-Zertifikate
+
+Nur vollständig verifizierte Backups gelten als erfolgreich erstellt.
 
 ---
 
@@ -207,7 +219,7 @@ Das Backup-Format ist bewusst modular aufgebaut.
 
 Neue Anwendungen können zusätzliche Daten ergänzen, ohne den bestehenden Aufbau zu verändern.
 
-Beispiele:
+Beispiel:
 
 ```text
 backup/
@@ -247,8 +259,20 @@ Ein gültiges Atlas-Backup muss mindestens enthalten:
 
 - `backup.info`
 - mindestens einen PostgreSQL-Dump
-- `data/`
-- `env/`
-- `certs/`
+- `data/n8n`
+- alle erforderlichen `.env`-Dateien
+- alle erforderlichen TLS-Zertifikate
 
 Fehlen diese Bestandteile, gilt das Backup als unvollständig und kann nicht wiederhergestellt werden.
+
+---
+
+# Architekturentscheidungen
+
+Atlas trifft folgende Architekturentscheidungen.
+
+- Jedes Backup besitzt eine einheitliche Verzeichnisstruktur.
+- Datenbanken werden automatisch erkannt und einzeln gesichert.
+- Konfigurationsdateien und Zertifikate werden unverändert übernommen.
+- Nur vollständig verifizierte Backups gelten als erfolgreich.
+- Das Backup-Format ist modular erweiterbar und rückwärtskompatibel.

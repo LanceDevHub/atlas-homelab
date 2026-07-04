@@ -2,9 +2,9 @@
 
 Dieses Dokument beschreibt den Transport von Ereignissen innerhalb der Atlas-Plattform.
 
-Es definiert, wie Infrastruktur-Komponenten Ereignisse bereitstellen, wie diese zwischengespeichert werden und wie sie an die Workflow-Plattform weitergeleitet werden.
+Es definiert, wie Infrastruktur-Komponenten Ereignisse erzeugen, lokal speichern und später an externe Workflow-Systeme weitergeleitet werden.
 
-Die Struktur der Ereignisse wird im Dokument
+Die Struktur eines Ereignisses wird im Dokument
 
 ```text
 event-format.md
@@ -21,6 +21,7 @@ Der Event-Transport verfolgt folgende Ziele.
 - Lose Kopplung zwischen Infrastruktur und Workflow-Plattform
 - Zuverlässige Ereignisübertragung
 - Wiederholbare Zustellung
+- Lokale Zwischenspeicherung
 - Unabhängigkeit vom Transportprotokoll
 - Erweiterbarkeit für zukünftige Transportwege
 
@@ -33,19 +34,27 @@ Der Event-Transport besteht aus vier Komponenten.
 ```text
 Infrastruktur
 
-↓
+        │
+
+        ▼
 
 Event Library
 
-↓
+        │
+
+        ▼
 
 Event Queue
 
-↓
+        │
+
+        ▼
 
 Event Dispatcher
 
-↓
+        │
+
+        ▼
 
 Workflow-Plattform
 ```
@@ -60,24 +69,39 @@ Jede Komponente besitzt genau eine Verantwortung.
 
 Infrastruktur-Komponenten erzeugen Ereignisse.
 
-Beispiele:
+Aktuell:
 
 - Backup Engine
 - Restore Engine
 - Transfer Engine
-- Monitoring
 
-Sie kennen ausschließlich die Event Library.
+Zukünftig:
+
+- Monitoring
+- Deployment
+- Health Checks
+
+Die Infrastruktur kennt ausschließlich die Event Library.
 
 ---
 
 ## Event Library
 
-Die Event Library erzeugt standardisierte JSON-Ereignisse.
+Die Event Library stellt die öffentliche API zum Erzeugen von Ereignissen bereit.
 
-Sie validiert den Aufbau eines Events und legt dieses in der Event Queue ab.
+Aktuell umfasst sie folgende Funktionen:
 
-Die Event Library kennt keine Transportprotokolle.
+- `event_emit`
+- `event_payload`
+
+Die Library
+
+- erzeugt Zeitstempel,
+- erstellt Dateinamen,
+- erzeugt das JSON-Ereignis,
+- legt das Ereignis in der Event Queue ab.
+
+Sie kennt keine Transportprotokolle und keine Workflow-Systeme.
 
 ---
 
@@ -89,7 +113,16 @@ Die Event Queue dient als lokale Zwischenspeicherung aller noch nicht verarbeite
 /opt/atlas/events
 ```
 
-Jedes Event wird als einzelne JSON-Datei gespeichert.
+Jedes Ereignis wird als einzelne JSON-Datei gespeichert.
+
+Beispiel:
+
+```text
+events/
+├── 20260704T030001123456789.json
+├── 20260704T030503987654321.json
+└── ...
+```
 
 Dadurch bleiben Ereignisse auch nach einem Neustart des Systems erhalten.
 
@@ -103,13 +136,15 @@ Er überträgt diese an die Workflow-Plattform.
 
 Nach erfolgreicher Verarbeitung wird das Ereignis aus der Event Queue entfernt.
 
+Der Dispatcher ist aktuell noch nicht implementiert.
+
 ---
 
 ## Workflow-Plattform
 
 Die Workflow-Plattform verarbeitet eingehende Ereignisse.
 
-Aktuell:
+Geplant ist aktuell:
 
 - n8n
 
@@ -122,35 +157,55 @@ Die Workflow-Plattform entscheidet selbst, welche Aktionen ausgeführt werden.
 Ein Ereignis durchläuft folgende Schritte.
 
 ```text
-Backup Engine
+backup.sh
 
-↓
+        │
+
+        ▼
+
+event_emit()
+
+        │
+
+        ▼
 
 Event Library
 
-↓
+        │
+
+        ▼
 
 JSON-Datei
 
-↓
+        │
 
-Event Queue
+        ▼
 
-↓
+/opt/atlas/events
+
+        │
+
+        ▼
 
 Event Dispatcher
 
-↓
+        │
 
-HTTP Request
+        ▼
 
-↓
+HTTP
+
+        │
+
+        ▼
 
 n8n
 
-↓
+        │
 
-Discord
+        ▼
+
+Discord / Mail / weitere Workflows
 ```
 
 ---
@@ -163,16 +218,11 @@ Die Event Queue befindet sich unter
 /opt/atlas/events
 ```
 
-Beispiel:
+Jede JSON-Datei repräsentiert genau ein Ereignis.
 
-```text
-events/
-├── 20260704T030001Z.json
-├── 20260704T030502Z.json
-└── ...
-```
+Die Dateinamen werden automatisch erzeugt und bestehen aus einem UTC-Zeitstempel mit Nanosekundenauflösung.
 
-Jede Datei enthält genau ein Ereignis.
+Dadurch sind sie chronologisch sortierbar und praktisch eindeutig.
 
 ---
 
@@ -184,19 +234,19 @@ Der Dispatcher versucht die Übertragung später erneut.
 
 Dadurch gehen keine Ereignisse verloren.
 
+Das Erzeugen eines Ereignisses beeinflusst die Infrastruktur-Komponenten nicht.
+
 ---
 
 # Transport
 
-Das Event-Format ist unabhängig vom Transportweg.
+Das Event-Format ist vollständig unabhängig vom Transportweg.
 
-Aktuell erfolgt die Übertragung über HTTP.
+Aktuell existiert lediglich die lokale Event Queue.
 
-Zukünftig sind weitere Transportwege möglich.
+Geplante Transportwege:
 
-Beispiele:
-
-- HTTPS
+- HTTP / HTTPS
 - MQTT
 - Redis
 - RabbitMQ
@@ -210,9 +260,10 @@ Die Infrastruktur-Komponenten müssen hierfür nicht angepasst werden.
 Atlas trifft folgende Architekturentscheidungen.
 
 - Infrastruktur-Komponenten erzeugen ausschließlich Ereignisse.
-- Ereignisse werden zunächst lokal gespeichert.
+- Alle Ereignisse werden zunächst lokal gespeichert.
 - Jedes Ereignis wird als einzelne JSON-Datei abgelegt.
 - Die Event Queue dient als Puffer zwischen Infrastruktur und Workflow-Plattform.
+- Die Event Library kennt keine Transportprotokolle.
 - Der Event Dispatcher übernimmt ausschließlich die Übertragung.
 - Die Workflow-Plattform verarbeitet ausschließlich eingehende Ereignisse.
 
@@ -230,9 +281,9 @@ Atlas trifft folgende Architekturentscheidungen.
 
 ## Implementierung
 
-⬜ Event Library implementieren
+✅ Event Library implementiert
 
-⬜ Event Queue implementieren
+✅ Event Queue implementiert
 
 ⬜ Event Dispatcher implementieren
 

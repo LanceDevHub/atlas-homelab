@@ -18,6 +18,8 @@ Der Restore stellt eine zuvor erstellte Atlas-Sicherung vollständig wieder her.
 
 Dabei werden alle gesicherten Laufzeitdaten auf den Zustand des gewählten Backups zurückgesetzt.
 
+Während des gesamten Restore-Prozesses werden Ereignisse über das Event-System erzeugt, sodass externe Systeme (z. B. n8n) den Ablauf verfolgen können.
+
 ---
 
 # Voraussetzungen
@@ -37,48 +39,76 @@ Vor dem Restore müssen folgende Voraussetzungen erfüllt sein.
 Der Restore besteht aus mehreren aufeinanderfolgenden Schritten.
 
 ```text
-Restore starten
+restore.started
+
         │
         ▼
+
 Backup verifizieren
+
         │
         ▼
+
 Backup-Informationen anzeigen
+
         │
         ▼
+
 Benutzerbestätigung
+
         │
         ▼
+
 Atlas-Dienste stoppen
+
         │
         ▼
+
 Pre-Restore-Backup erstellen
+
         │
         ▼
+
 PostgreSQL wiederherstellen
+
         │
         ▼
+
 n8n-Daten wiederherstellen
+
         │
         ▼
+
 .env-Dateien wiederherstellen
+
         │
         ▼
+
 TLS-Zertifikate wiederherstellen
+
         │
         ▼
+
 Atlas-Dienste starten
+
         │
         ▼
+
 Restore verifizieren
+
         │
         ▼
-Restore abgeschlossen
+
+restore.completed
 ```
 
 Jeder Schritt muss erfolgreich abgeschlossen werden.
 
-Bei einem Fehler wird der Restore sofort beendet.
+Tritt während eines Schrittes ein Fehler auf, wird
+
+- ein `restore.failed`-Event erzeugt,
+- der Restore sofort beendet und
+- der Fehler ausgegeben.
 
 ---
 
@@ -242,7 +272,31 @@ Kontrolliert werden:
 - n8n läuft
 - Traefik läuft
 
-Nur wenn alle Dienste erfolgreich laufen, gilt der Restore als abgeschlossen.
+Erst wenn alle Dienste erfolgreich laufen, gilt der Restore als abgeschlossen.
+
+---
+
+# Event-System
+
+Während des Restore-Prozesses werden Ereignisse erzeugt.
+
+Folgende Ereignisse werden aktuell verwendet.
+
+| Ereignis | Beschreibung |
+|----------|--------------|
+| `restore.started` | Restore wurde gestartet |
+| `restore.completed` | Restore erfolgreich abgeschlossen |
+| `restore.failed` | Restore aufgrund eines Fehlers beendet |
+
+Bei einem Fehler enthält der Payload zusätzlich den fehlgeschlagenen Verarbeitungsschritt.
+
+Beispiel:
+
+```json
+{
+    "step": "restore_postgres"
+}
+```
 
 ---
 
@@ -273,7 +327,57 @@ set -Eeuo pipefail
 
 Dadurch wird der Restore bei jedem Fehler sofort beendet.
 
+Vor jedem kritischen Verarbeitungsschritt werden mögliche Fehler überprüft.
+
+Bei einem Fehler
+
+- wird ein `restore.failed`-Event erzeugt,
+- der Fehler ausgegeben und
+- das Skript beendet.
+
 Ein unvollständiger Restore wird niemals als erfolgreich betrachtet.
+
+---
+
+# Architekturentscheidungen
+
+Atlas trifft folgende Architekturentscheidungen.
+
+- Vor jedem Restore wird das Backup vollständig validiert.
+- Vor jedem Restore wird automatisch ein Pre-Restore-Backup erstellt.
+- Restore-Ereignisse werden über das Event-System veröffentlicht.
+- Mehrere PostgreSQL-Datenbanken werden automatisch erkannt.
+- Der Restore wird nach erfolgreichem Abschluss automatisch verifiziert.
+
+---
+
+# Status
+
+## Architektur
+
+✅ Restore-Prozess definiert
+
+✅ Backup-Verifikation definiert
+
+✅ Restore-Verifikation definiert
+
+## Implementierung
+
+✅ Backup-Verifikation
+
+✅ Pre-Restore-Backup
+
+✅ PostgreSQL-Restore
+
+✅ n8n-Restore
+
+✅ Konfigurations-Restore
+
+✅ Zertifikats-Restore
+
+✅ Restore-Verifikation
+
+✅ Event-System integriert
 
 ---
 

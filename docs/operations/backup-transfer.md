@@ -6,6 +6,8 @@ Die Transfer Engine überträgt lokal erstellte Backups auf ein externes Backup-
 
 Sie arbeitet unabhängig von der Backup Engine und übernimmt ausschließlich die Übertragung bereits vorhandener Backups.
 
+Während des gesamten Transfer-Prozesses werden Ereignisse über das Event-System erzeugt, sodass externe Systeme (z. B. n8n) den Ablauf verfolgen können.
+
 ---
 
 # Ziel
@@ -14,10 +16,10 @@ Die Transfer Engine stellt sicher, dass lokale Backups automatisch auf ein exter
 
 Dadurch werden folgende Ziele erreicht:
 
-- externe Datensicherung
+- Externe Datensicherung
 - Trennung von Backup und Übertragung
-- automatische Synchronisation
-- wiederholte Übertragungsversuche
+- Automatische Synchronisation
+- Wiederholte Übertragungsversuche
 - Unterstützung mehrerer Backup-Ziele
 
 ---
@@ -55,8 +57,6 @@ Dadurch bleiben Backup-Erstellung und Backup-Übertragung vollständig voneinand
 
 # Komponenten
 
-Die Transfer Engine besteht aus zwei Komponenten.
-
 ## Backup-Quelle
 
 Lokale Backups werden aus folgendem Verzeichnis übertragen.
@@ -86,24 +86,39 @@ Das Netzlaufwerk wird dauerhaft über CIFS eingebunden.
 Der Transfer erfolgt in mehreren Schritten.
 
 ```text
+transfer.started
+
+        │
+        ▼
+
 Backup-Ziel prüfen
 
-↓
+        │
+        ▼
 
 Neue Backups übertragen
 
-↓
+        │
+        ▼
 
 Bereits vorhandene Backups überspringen
 
-↓
+        │
+        ▼
 
 Übertragung verifizieren
 
-↓
+        │
+        ▼
 
-Transfer abgeschlossen
+transfer.completed
 ```
+
+Tritt während der Übertragung ein Fehler auf, wird
+
+- ein `transfer.failed`-Event erzeugt,
+- der Transfer beendet und
+- der Fehler ausgegeben.
 
 ---
 
@@ -125,9 +140,11 @@ Fehlende Backups führen zu einem Fehler und beenden den Transfer.
 
 ---
 
-# Fehlerbehandlung
+# Backup-Ziel
 
-Ist das Backup-Ziel nicht erreichbar, wird der Transfer übersprungen.
+Vor Beginn der Übertragung wird überprüft, ob das Backup-Ziel erreichbar ist.
+
+Ist das Ziel nicht verfügbar, wird der Transfer übersprungen.
 
 Beispiel:
 
@@ -140,6 +157,30 @@ Transfer skipped.
 ```
 
 Dadurch kann die Transfer Engine regelmäßig ausgeführt werden, ohne Fehler zu erzeugen, wenn das externe Backup-Ziel vorübergehend nicht verfügbar ist.
+
+---
+
+# Event-System
+
+Während des Transfer-Prozesses werden Ereignisse erzeugt.
+
+Folgende Ereignisse werden aktuell verwendet.
+
+| Ereignis | Beschreibung |
+|----------|--------------|
+| `transfer.started` | Transfer wurde gestartet |
+| `transfer.completed` | Transfer erfolgreich abgeschlossen |
+| `transfer.failed` | Transfer aufgrund eines Fehlers beendet |
+
+Bei einem Fehler enthält der Payload zusätzlich den fehlgeschlagenen Verarbeitungsschritt.
+
+Beispiel:
+
+```json
+{
+    "step": "transfer_backups"
+}
+```
 
 ---
 
@@ -173,6 +214,28 @@ Dadurch können zukünftige Backup-Ziele ergänzt werden, ohne die Transfer Engi
 
 ---
 
+# Fehlerbehandlung
+
+Das Skript verwendet
+
+```bash
+set -Eeuo pipefail
+```
+
+Vor jedem kritischen Verarbeitungsschritt werden mögliche Fehler überprüft.
+
+Bei einem Fehler
+
+- wird ein `transfer.failed`-Event erzeugt,
+- der Fehler ausgegeben und
+- das Skript beendet.
+
+Ein unvollständiger Transfer wird niemals als erfolgreich betrachtet.
+
+Ist das Backup-Ziel nicht erreichbar, wird der Transfer bewusst übersprungen und beendet sich ohne Fehler.
+
+---
+
 # Architekturentscheidungen
 
 Atlas trifft folgende Architekturentscheidungen.
@@ -182,6 +245,7 @@ Atlas trifft folgende Architekturentscheidungen.
 - Externe Backups erfolgen unabhängig von der Backup-Erstellung.
 - Bereits übertragene Backups werden nicht erneut kopiert.
 - Nicht erreichbare Backup-Ziele erzeugen keinen Fehler.
+- Alle Transfer-Ereignisse werden über das Event-System veröffentlicht.
 - Die Transfer Engine kennt ausschließlich Quelle und Ziel der Übertragung.
 
 ---
@@ -203,5 +267,7 @@ Atlas trifft folgende Architekturentscheidungen.
 ✅ SMB-Integration implementiert
 
 ✅ Übertragungsverifikation implementiert
+
+✅ Event-System integriert
 
 ⬜ Weitere Backup-Ziele integrieren
