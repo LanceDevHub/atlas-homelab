@@ -169,6 +169,35 @@ sudo ufw status verbose
 
 ---
 
+# 9. Basiswerkzeuge
+
+Atlas verwendet einige systemweite Werkzeuge, die von verschiedenen Infrastruktur-Komponenten benötigt werden.
+
+Installation:
+
+```bash
+sudo apt install \
+    jq \
+    tree \
+    curl \
+    git \
+    -y
+```
+
+## jq
+
+`jq` dient der Verarbeitung und Erzeugung von JSON-Dokumenten.
+
+Atlas verwendet `jq` unter anderem für:
+
+- Event-System
+- JSON-Verarbeitung
+- zukünftige API-Integrationen
+
+JSON wird innerhalb der Atlas-Plattform grundsätzlich mit `jq` erzeugt und verarbeitet.
+
+---
+
 # Erreichte Sicherheitsziele
 
 - SSH ausschließlich per Public-Key
