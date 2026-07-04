@@ -97,6 +97,7 @@ event_emit() {
     local event="${2}"
     local status="${3}"
     local payload="${4-}"
+    
 
     if [[ -z "${payload}" ]]; then
         payload='{}'
