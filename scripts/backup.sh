@@ -6,6 +6,9 @@
 # Fail if any command in a pipeline fails (pipefail)
 set -Eeuo pipefail
 
+# get lib functions
+source "./lib/events.sh"
+
 # ==================================================
 # Configuration
 # ==================================================
@@ -50,7 +53,7 @@ cleanup_failed_backup() {
     echo "Backup failed."
     echo "Removing incomplete backup..."
 
-    rm -rf "${BACKUP_DIR}"
+    rm -rf "${BACKUP_DIR}" || true
 
     echo "Incomplete backup removed."
 }
@@ -58,7 +61,10 @@ cleanup_failed_backup() {
 create_backup_directory() {
     echo "==> Creating backup directory..."
 
-    mkdir -p "${BACKUP_DIR}"
+    if ! mkdir -p "${BACKUP_DIR}"; then
+        emit_backup_failed "create_backup_directory"
+        return 1
+    fi
 
     echo "Backup directory: ${BACKUP_DIR}"
     echo
@@ -67,11 +73,15 @@ create_backup_directory() {
 create_backup_info() {
     echo "==> Creating backup metadata..."
 
-    cat > "${BACKUP_DIR}/backup.info" <<EOF
+    if ! cat > "${BACKUP_DIR}/backup.info" <<EOF
 BACKUP_VERSION=1
 TIMESTAMP=${TIMESTAMP}
 HOSTNAME=$(hostname)
 EOF
+    then
+        emit_backup_failed "create_backup_info"
+        return 1
+    fi
 
     echo "Backup metadata created."
     echo
@@ -81,12 +91,19 @@ backup_postgres() {
     echo "==> Backing up PostgreSQL..."
 
     set -a
-    source "${POSTGRES_ENV}"
+    if ! source "${POSTGRES_ENV}"; then
+        set +a
+        emit_backup_failed "backup_postgres"
+        return 1
+    fi
     set +a
 
-    mkdir -p "${BACKUP_DIR}/postgres"
+    if ! mkdir -p "${BACKUP_DIR}/postgres"; then
+        emit_backup_failed "backup_postgres"
+        return 1
+    fi
 
-    mapfile -t databases < <(
+    if ! mapfile -t databases < <(
         PGPASSWORD="${POSTGRES_PASSWORD}" \
         psql \
             -h "${POSTGRES_HOST}" \
@@ -97,20 +114,27 @@ backup_postgres() {
             -c "SELECT datname
                 FROM pg_database
                 WHERE datistemplate = false
-                  AND datname <> 'postgres';"
-    )
+                AND datname <> 'postgres';"
+    ); then
+        emit_backup_failed "backup_postgres"
+        return 1
+    fi
 
     for database in "${databases[@]}"; do
         echo "  ✓ ${database}"
 
-        PGPASSWORD="${POSTGRES_PASSWORD}" \
-        pg_dump \
-            -h "${POSTGRES_HOST}" \
-            -p "${POSTGRES_PORT}" \
-            -U "${POSTGRES_USER}" \
-            -Fc \
-            "${database}" \
-            -f "${BACKUP_DIR}/postgres/${database}.dump"
+        if ! PGPASSWORD="${POSTGRES_PASSWORD}" \
+            pg_dump \
+                -h "${POSTGRES_HOST}" \
+                -p "${POSTGRES_PORT}" \
+                -U "${POSTGRES_USER}" \
+                -Fc \
+                "${database}" \
+                -f "${BACKUP_DIR}/postgres/${database}.dump"
+        then
+            emit_backup_failed "backup_postgres"
+            return 1
+        fi
     done
 
     echo
@@ -121,8 +145,15 @@ backup_postgres() {
 backup_n8n() {
     echo "==> Backing up n8n data..."
 
-    mkdir -p "${BACKUP_DIR}/data"
-    cp -a "${DATA_DIR}/n8n" "${BACKUP_DIR}/data/"
+    if ! mkdir -p "${BACKUP_DIR}/data"; then
+        emit_backup_failed "backup_n8n"
+        return 1
+    fi
+
+    if ! cp -a "${DATA_DIR}/n8n" "${BACKUP_DIR}/data/"; then
+        emit_backup_failed "backup_n8n"
+        return 1
+    fi
 
     echo "n8n backup completed."
     echo
@@ -131,13 +162,20 @@ backup_n8n() {
 backup_env() {
     echo "==> Backing up environment files..."
 
-    mkdir -p "${BACKUP_DIR}/env"
+    if ! mkdir -p "${BACKUP_DIR}/env"; then
+        emit_backup_failed "backup_env"
+        return 1
+    fi
 
     shopt -s nullglob
 
     for env_file in "${COMPOSE_DIR}"/*/.env; do
         service_name=$(basename "$(dirname "${env_file}")")
-        cp "${env_file}" "${BACKUP_DIR}/env/${service_name}.env"
+        if ! cp "${env_file}" "${BACKUP_DIR}/env/${service_name}.env"; then
+            emit_backup_failed "backup_env"
+            return 1
+        fi
+
         echo "  ✓ ${service_name}.env"
     done
 
@@ -151,22 +189,46 @@ backup_env() {
 backup_certs() {
     echo "==> Backing up TLS certificates..."
 
-    cp -a "${CERTS_DIR}" "${BACKUP_DIR}/"
+    if ! cp -a "${CERTS_DIR}" "${BACKUP_DIR}/"; then
+        emit_backup_failed "backup_certs"
+        return 1
+    fi
 
     echo "TLS certificates backup completed."
     echo
 }
 
+emit_backup_failed() {
+
+    local step="${1}"
+
+    local payload
+
+    payload=$(
+        event_payload \
+            --arg step "${step}" \
+            '{
+                step: $step
+            }'
+    )
+
+    event_emit \
+        "atlas-backup" \
+        "backup.failed" \
+        "error" \
+        "${payload}"
+
+}
+
 verify_backup() {
     echo "==> Verifying backup..."
-
-    local errors=0
 
     if [[ -f "${BACKUP_DIR}/backup.info" ]]; then
         echo "  ✓ backup.info"
     else
         echo "  ✗ backup.info missing"
-        ((errors++))
+
+        return 1
     fi
 
     if compgen -G "${BACKUP_DIR}/postgres/*.dump" > /dev/null; then
@@ -175,14 +237,16 @@ verify_backup() {
         done
     else
         echo "  ✗ No PostgreSQL dumps found"
-        ((errors++))
+
+        return 1
     fi
 
     if [[ -d "${BACKUP_DIR}/data/n8n" ]]; then
         echo "  ✓ n8n data"
     else
         echo "  ✗ n8n data missing"
-        ((errors++))
+
+        return 1
     fi
 
     for service in "${REQUIRED_ENV_FILES[@]}"; do
@@ -190,7 +254,8 @@ verify_backup() {
             echo "  ✓ ${service}.env"
         else
             echo "  ✗ ${service}.env missing"
-            ((errors++))
+
+            return 1
         fi
     done
 
@@ -199,17 +264,12 @@ verify_backup() {
             echo "  ✓ ${file}"
         else
             echo "  ✗ ${file} missing"
-            ((errors++))
+
+            return 1
         fi
     done
 
     echo
-
-    if (( errors > 0 )); then
-        echo "Backup verification failed."
-        return 1
-    fi
-
     echo "Backup verification successful."
     echo
 }
@@ -234,7 +294,10 @@ rotate_backups() {
     for ((i=0; i<backups_to_delete; i++)); do
         echo "Deleting backup:"
         echo "  $(basename "${backups[i]}")"
-        rm -rf "${backups[i]}"
+        if ! rm -rf "${backups[i]}"; then
+            emit_backup_failed "rotate_backups"
+            return 1
+        fi
     done
 
     echo
@@ -243,6 +306,12 @@ rotate_backups() {
 }
 
 main() {
+
+    event_emit \
+    "atlas-backup" \
+    "backup.started" \
+    "info"
+
     trap cleanup_failed_backup ERR
 
     echo
@@ -261,6 +330,22 @@ main() {
 
     verify_backup
     rotate_backups
+
+    local payload
+
+    payload=$(
+        event_payload \
+            --arg directory "${TIMESTAMP}" \
+            '{
+                directory: $directory
+            }'
+    )
+
+    event_emit \
+        "atlas-backup" \
+        "backup.completed" \
+        "success" \
+        "${payload}"
 
     trap - ERR
 
