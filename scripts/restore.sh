@@ -6,6 +6,9 @@
 # Fail if any command in a pipeline fails (pipefail)
 set -Eeuo pipefail
 
+# get lib functions
+source "./lib/events.sh"
+
 # ==================================================
 # Configuration
 # ==================================================
@@ -56,7 +59,9 @@ check_arguments() {
     if [[ -z "${BACKUP_DIR}" ]]; then
         echo "Usage:"
         echo "  restore.sh <backup-directory>"
-        exit 1
+
+        emit_restore_failed "check_arguments"
+        return 1
     fi
 }
 
@@ -67,8 +72,10 @@ verify_backup() {
 
     # Verify backup directory.
     if [[ ! -d "${BACKUP_DIR}" ]]; then
-        echo "  ✗ Backup directory not found"
-        exit 1
+        echo "✗ Backup directory not found"
+
+        emit_restore_failed "verify_backup"
+        return 1
     fi
 
     # Verify metadata.
@@ -80,8 +87,10 @@ verify_backup() {
         echo "  ✓ backup.info"
 
     else
-        echo "  ✗ backup.info missing"
-        exit 1
+        echo "✗ backup.info missing"
+
+        emit_restore_failed "verify_backup"
+        return 1
     fi
 
     # Verify backup version.
@@ -140,7 +149,9 @@ verify_backup() {
 
     if (( errors > 0 )); then
         echo "Backup verification failed."
-        exit 1
+
+        emit_restore_failed "verify_backup"
+        return 1
     fi
 
     echo "Backup verification successful."
@@ -169,7 +180,9 @@ confirm_restore() {
     if [[ "${confirmation}" != "YES" ]]; then
         echo
         echo "Restore aborted."
-        exit 1
+
+        emit_restore_failed "confirm_restore"
+        return 1
     fi
 
     echo
@@ -183,7 +196,10 @@ stop_service() {
     if [[ -n "$(docker compose -f "${compose_file}" ps --status running -q)" ]]; then
         echo "Stopping ${service_name}..."
 
-        docker compose -f "${compose_file}" down
+        if ! docker compose -f "${compose_file}" down; then
+            emit_restore_failed "stop_services"
+            return 1
+        fi
 
         echo "${service_name} stopped successfully."
     else
@@ -199,7 +215,10 @@ start_service() {
     if [[ -z "$(docker compose -f "${compose_file}" ps --status running -q)" ]]; then
         echo "Starting ${service_name}..."
 
-        docker compose -f "${compose_file}" up -d
+        if ! docker compose -f "${compose_file}" up -d; then
+            emit_restore_failed "start_services"
+            return 1
+        fi
 
         echo "${service_name} started successfully."
     else
@@ -211,9 +230,17 @@ start_service() {
 stop_services() {
     echo "==> Stopping Atlas services..."
 
-    stop_service "n8n" "${N8N_COMPOSE}"
-    stop_service "PostgreSQL" "${POSTGRES_COMPOSE}"
-    stop_service "Traefik" "${TRAEFIK_COMPOSE}"
+    if ! stop_service "n8n" "${N8N_COMPOSE}"; then
+        return 1
+    fi
+
+    if ! stop_service "PostgreSQL" "${POSTGRES_COMPOSE}"; then
+        return 1
+    fi
+
+    if ! stop_service "Traefik" "${TRAEFIK_COMPOSE}"; then
+        return 1
+    fi
 
     echo
     echo "All services stopped."
@@ -223,9 +250,17 @@ stop_services() {
 start_services() {
     echo "==> Starting Atlas services..."
 
-    start_service "PostgreSQL" "${POSTGRES_COMPOSE}"
-    start_service "n8n" "${N8N_COMPOSE}"
-    start_service "Traefik" "${TRAEFIK_COMPOSE}"
+    if ! start_service "PostgreSQL" "${POSTGRES_COMPOSE}"; then
+        return 1
+    fi
+
+    if ! start_service "n8n" "${N8N_COMPOSE}"; then
+        return 1
+    fi
+
+    if ! start_service "Traefik" "${TRAEFIK_COMPOSE}"; then
+        return 1
+    fi
 
     echo
     echo "All services started."
@@ -236,28 +271,45 @@ start_services() {
 backup_current_state() {
     echo "==> Creating pre-restore backup..."
 
-    mkdir -p "${PRE_RESTORE_DIR}"
+    if ! mkdir -p "${PRE_RESTORE_DIR}"; then
+        emit_restore_failed "backup_current_state"
+        return 1
+    fi
 
-    # Backup n8n data
-    mkdir -p "${PRE_RESTORE_DIR}/data"
+    if ! mkdir -p "${PRE_RESTORE_DIR}/data"; then
+        emit_restore_failed "backup_current_state"
+        return 1
+    fi
 
-    cp -a "${DATA_DIR}/n8n" "${PRE_RESTORE_DIR}/data/"
+    if ! cp -a "${DATA_DIR}/n8n" "${PRE_RESTORE_DIR}/data/"; then
+        emit_restore_failed "backup_current_state"
+        return 1
+    fi
 
-    # Backup environment files
-    mkdir -p "${PRE_RESTORE_DIR}/env"
+    if ! mkdir -p "${PRE_RESTORE_DIR}/env"; then
+        emit_restore_failed "backup_current_state"
+        return 1
+    fi
 
     shopt -s nullglob
 
     for env_file in "${COMPOSE_DIR}"/*/.env; do
+        local service_name
         service_name=$(basename "$(dirname "${env_file}")")
 
-        cp "${env_file}" "${PRE_RESTORE_DIR}/env/${service_name}.env"
+        if ! cp "${env_file}" "${PRE_RESTORE_DIR}/env/${service_name}.env"; then
+            shopt -u nullglob
+            emit_restore_failed "backup_current_state"
+            return 1
+        fi
     done
 
     shopt -u nullglob
 
-    # Backup TLS certificates
-    cp -a "${CERTS_DIR}" "${PRE_RESTORE_DIR}/"
+    if ! cp -a "${CERTS_DIR}" "${PRE_RESTORE_DIR}/"; then
+        emit_restore_failed "backup_current_state"
+        return 1
+    fi
 
     echo "Pre-restore backup created:"
     echo "  ${PRE_RESTORE_DIR}"
@@ -269,26 +321,44 @@ load_postgres_env() {
 
     # Export all variables from the PostgreSQL .env file.
     set -a
-    source "${POSTGRES_ENV}"
-    set +a
 
+    if ! source "${POSTGRES_ENV}"; then
+        set +a
+        emit_restore_failed "restore_postgres"
+        return 1
+    fi
+
+    set +a
 }
 
 start_postgres() {
     echo "==> Preparing PostgreSQL..."
 
-    load_postgres_env
+    if ! load_postgres_env; then
+        return 1
+    fi
 
-    start_service "PostgreSQL" "${POSTGRES_COMPOSE}"
+    if ! start_service "PostgreSQL" "${POSTGRES_COMPOSE}"; then
+        return 1
+    fi
 
     echo "Waiting for PostgreSQL..."
 
+    local retries=30
+
     until PGPASSWORD="${POSTGRES_PASSWORD}" \
         pg_isready \
-        -h "${POSTGRES_HOST}" \
-        -p "${POSTGRES_PORT}" \
-        -U "${POSTGRES_USER}" >/dev/null 2>&1
+            -h "${POSTGRES_HOST}" \
+            -p "${POSTGRES_PORT}" \
+            -U "${POSTGRES_USER}" >/dev/null 2>&1
     do
+        ((retries--))
+
+        if (( retries == 0 )); then
+            emit_restore_failed "restore_postgres"
+            return 1
+        fi
+
         sleep 1
     done
 
@@ -300,7 +370,9 @@ restore_postgres() {
     echo "==> Restoring PostgreSQL..."
 
     # Start PostgreSQL and wait until it is ready.
-    start_postgres
+    if ! start_postgres; then
+        return 1
+    fi
 
     # Restore every database dump.
     for dump_file in "${BACKUP_DIR}"/postgres/*.dump; do
@@ -308,8 +380,13 @@ restore_postgres() {
 
         database=$(basename "${dump_file}" .dump)
 
-        recreate_database "${database}"
-        restore_database "${database}" "${dump_file}"
+        if ! recreate_database "${database}"; then
+            return 1
+        fi
+
+        if ! restore_database "${database}" "${dump_file}"; then
+            return 1
+        fi
     done
 
     echo "PostgreSQL restore completed."
@@ -321,13 +398,13 @@ recreate_database() {
 
     echo "==> Recreating database '${database}'..."
 
-    PGPASSWORD="${POSTGRES_PASSWORD}" \
-    psql \
-        -v ON_ERROR_STOP=1 \
-        -h "${POSTGRES_HOST}" \
-        -p "${POSTGRES_PORT}" \
-        -U "${POSTGRES_USER}" \
-        -d postgres <<EOF
+    if ! PGPASSWORD="${POSTGRES_PASSWORD}" \
+        psql \
+            -v ON_ERROR_STOP=1 \
+            -h "${POSTGRES_HOST}" \
+            -p "${POSTGRES_PORT}" \
+            -U "${POSTGRES_USER}" \
+            -d postgres <<EOF
 SELECT pg_terminate_backend(pid)
 FROM pg_stat_activity
 WHERE datname = '${database}'
@@ -337,6 +414,10 @@ DROP DATABASE IF EXISTS ${database};
 
 CREATE DATABASE ${database};
 EOF
+    then
+        emit_restore_failed "restore_postgres"
+        return 1
+    fi
 
     echo "Database '${database}' recreated."
     echo
@@ -348,13 +429,17 @@ restore_database() {
 
     echo "==> Restoring database '${database}'..."
 
-    PGPASSWORD="${POSTGRES_PASSWORD}" \
-    pg_restore \
-        -h "${POSTGRES_HOST}" \
-        -p "${POSTGRES_PORT}" \
-        -U "${POSTGRES_USER}" \
-        -d "${database}" \
-        "${dump_file}"
+    if ! PGPASSWORD="${POSTGRES_PASSWORD}" \
+        pg_restore \
+            -h "${POSTGRES_HOST}" \
+            -p "${POSTGRES_PORT}" \
+            -U "${POSTGRES_USER}" \
+            -d "${database}" \
+            "${dump_file}"
+    then
+        emit_restore_failed "restore_postgres"
+        return 1
+    fi
 
     echo "Database '${database}' restored."
     echo
@@ -363,11 +448,15 @@ restore_database() {
 restore_n8n() {
     echo "==> Restoring n8n data..."
 
-    # Remove current n8n data.
-    rm -rf "${DATA_DIR}/n8n"
+    if ! rm -rf "${DATA_DIR}/n8n"; then
+        emit_restore_failed "restore_n8n"
+        return 1
+    fi
 
-    # Restore n8n data from the backup.
-    cp -a "${BACKUP_DIR}/data/n8n" "${DATA_DIR}/"
+    if ! cp -a "${BACKUP_DIR}/data/n8n" "${DATA_DIR}/"; then
+        emit_restore_failed "restore_n8n"
+        return 1
+    fi
 
     echo "n8n data restored."
     echo
@@ -379,10 +468,14 @@ restore_envs() {
     shopt -s nullglob
 
     for env_file in "${BACKUP_DIR}/env/"*.env; do
-        # Use the backup filename as the service name.
+        local service_name
         service_name=$(basename "${env_file}" .env)
 
-        cp "${env_file}" "${COMPOSE_DIR}/${service_name}/.env"
+        if ! cp "${env_file}" "${COMPOSE_DIR}/${service_name}/.env"; then
+            shopt -u nullglob
+            emit_restore_failed "restore_envs"
+            return 1
+        fi
 
         echo "  ✓ ${service_name}.env"
     done
@@ -397,12 +490,20 @@ restore_envs() {
 restore_certs() {
     echo "==> Restoring TLS certificates..."
 
-    # Remove current certs.
-    rm -rf "${CERTS_DIR}"
-    mkdir -p "${CERTS_DIR}"
+    if ! rm -rf "${CERTS_DIR}"; then
+        emit_restore_failed "restore_certs"
+        return 1
+    fi
 
-    # Restore certs from the backup.
-    cp -a "${BACKUP_DIR}/certs/." "${CERTS_DIR}/"
+    if ! mkdir -p "${CERTS_DIR}"; then
+        emit_restore_failed "restore_certs"
+        return 1
+    fi
+
+    if ! cp -a "${BACKUP_DIR}/certs/." "${CERTS_DIR}/"; then
+        emit_restore_failed "restore_certs"
+        return 1
+    fi
 
     echo "TLS certificates restored."
     echo
@@ -445,17 +546,45 @@ verify_restore() {
     if (( errors > 0 )); then
         echo "Restore verification failed."
 
-        # Abort if one or more services failed to start.
-        exit 1
+        emit_restore_failed "verify_restore"
+        return 1
     fi
 
     echo "Restore verification successful."
     echo
 }
 
+emit_restore_failed() {
+
+    local step="${1}"
+
+    local payload
+
+    payload=$(
+        event_payload \
+            --arg step "${step}" \
+            '{
+                step: $step
+            }'
+    )
+
+    event_emit \
+        "atlas-restore" \
+        "restore.failed" \
+        "error" \
+        "${payload}"
+
+}
+
 
 
 main() {
+
+
+    event_emit \
+    "atlas-restore" \
+    "restore.started" \
+    "info"
 
     echo
     echo "======================================="
@@ -495,6 +624,23 @@ main() {
     start_services
 
     verify_restore
+
+    local payload
+
+    payload=$(
+        event_payload \
+            --arg backup "$(basename "${BACKUP_DIR}")" \
+            '{
+                backup: $backup
+            }'
+    )
+
+    event_emit \
+        "atlas-restore" \
+        "restore.completed" \
+        "success" \
+        "${payload}"
+
 
 
     echo "======================================="
