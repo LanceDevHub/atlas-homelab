@@ -6,8 +6,11 @@
 # Fail if any command in a pipeline fails (pipefail)
 set -Eeuo pipefail
 
+# Directory of this script
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # get lib functions
-source "./lib/events.sh"
+source "${SCRIPT_DIR}/lib/events.sh"
 
 # ==================================================
 # Configuration
