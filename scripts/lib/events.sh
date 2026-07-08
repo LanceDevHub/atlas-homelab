@@ -16,7 +16,7 @@ create_events_directory() {
 
 create_timestamp() {
 
-    date -u +"%Y-%m-%dT%H:%M:%SZ"
+    date +"%Y-%m-%dT%H:%M:%SZ"
 
 }
 
