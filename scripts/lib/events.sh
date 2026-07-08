@@ -13,16 +13,15 @@ create_events_directory() {
     mkdir -p "${EVENTS_DIR}"
 
 }
-
 create_timestamp() {
 
-    date +"%Y-%m-%dT%H:%M:%SZ"
+    date +"%Y-%m-%dT%H:%M:%S%:z"
 
 }
 
 create_filename() {
 
-    date -u +"%Y%m%dT%H%M%S%N.json"
+    date +"%Y%m%dT%H%M%S%N.json"
 
 }
 
