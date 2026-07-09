@@ -18,6 +18,7 @@ Das Event-System verfolgt folgende Ziele.
 - Erweiterbare Automatisierungen
 - Zentrale Workflow-Steuerung
 - Unabhängigkeit von Benachrichtigungsdiensten
+- Zuverlässige Ereignisverarbeitung
 
 ---
 
@@ -25,11 +26,11 @@ Das Event-System verfolgt folgende Ziele.
 
 Infrastruktur-Komponenten kommunizieren niemals direkt mit externen Diensten.
 
-Stattdessen erzeugen sie Ereignisse (Events), welche anschließend von der zentralen Workflow-Plattform verarbeitet werden.
+Stattdessen erzeugen sie standardisierte Ereignisse (Events), die zunächst lokal gespeichert und anschließend vom Event Dispatcher verarbeitet werden.
 
 Dadurch besitzt jede Komponente genau eine Aufgabe.
 
-Alle Infrastruktur-Komponenten erzeugen ihre Ereignisse über die gemeinsame Event-Bibliothek (`event_emit()`), wodurch alle Events automatisch dasselbe Format besitzen.
+Alle Infrastruktur-Komponenten erzeugen ihre Ereignisse ausschließlich über die gemeinsame Event-Bibliothek (`event_emit()`), wodurch sämtliche Events automatisch dieselbe Struktur besitzen.
 
 Beispiel:
 
@@ -46,7 +47,11 @@ Event Library
 
 ↓
 
-JSON Event
+Event Queue
+
+↓
+
+Event Dispatcher
 
 ↓
 
@@ -57,16 +62,16 @@ n8n
 Discord
 ```
 
-Die Backup Engine kennt weder Discord noch andere Benachrichtigungssysteme.
+Die Backup Engine kennt weder den Dispatcher, n8n noch Discord.
 
 ---
 
 # Architektur
 
-Das Event-System besteht aus vier Ebenen.
+Das Event-System besteht aus fünf logisch getrennten Ebenen.
 
 ```text
-                    Infrastruktur
+                     Infrastruktur
 
       ┌────────┬─────────┬──────────┬────────────┐
       │        │         │          │            │
@@ -76,13 +81,19 @@ Das Event-System besteht aus vier Ebenen.
                  │
                  ▼
             Event Library
-          (event_emit())
+           (event_emit())
                  │
                  ▼
-            JSON Event Files
+             Event Queue
+        (/opt/atlas/events)
                  │
                  ▼
-                n8n
+          Event Dispatcher
+                 │
+             HTTP Webhook
+                 │
+                 ▼
+                 n8n
       ┌──────────┼──────────┐
       │          │          │
       ▼          ▼          ▼
@@ -109,8 +120,9 @@ Beispiele:
 - Restore gestartet
 - Restore abgeschlossen
 - Restore fehlgeschlagen
-- Backup übertragen
-- Backup-Übertragung fehlgeschlagen
+- Backup-Transfer gestartet
+- Backup-Transfer abgeschlossen
+- Backup-Transfer fehlgeschlagen
 
 Die Infrastruktur entscheidet nicht, wie auf ein Ereignis reagiert wird.
 
@@ -128,7 +140,7 @@ Aktuell besteht sie aus folgenden Funktionen:
 Sie übernimmt unter anderem:
 
 - Erzeugung des Zeitstempels
-- Dateinamen
+- Erzeugung des Dateinamens
 - JSON-Formatierung
 - Schreiben der Event-Datei
 
@@ -136,19 +148,23 @@ Dadurch müssen Infrastruktur-Komponenten keine JSON-Dateien selbst erzeugen.
 
 ---
 
-## Event-System
+## Event Queue
 
-Das Event-System dient als standardisierte Schnittstelle zwischen Infrastruktur und Workflow-Plattform.
+Die Event Queue speichert erzeugte Ereignisse lokal als JSON-Dateien.
 
-Es beschreibt:
+Sie dient als Puffer zwischen Infrastruktur und Workflow-System.
 
-- Ereignistyp
-- Zeitpunkt
-- Quelle
-- Status
-- Payload
+Dadurch bleiben Ereignisse auch dann erhalten, wenn n8n oder das Netzwerk kurzfristig nicht verfügbar sind.
 
-Das Event-System besitzt keine Logik zur Verarbeitung der Ereignisse.
+---
+
+## Event Dispatcher
+
+Der Event Dispatcher verarbeitet die lokale Event Queue.
+
+Für jedes Event wird ein HTTP-Request an den zentralen n8n-Webhook gesendet.
+
+Erst nach erfolgreicher Verarbeitung wird das entsprechende Event aus der Queue entfernt.
 
 ---
 
@@ -162,8 +178,7 @@ Beispiele:
 
 - Discord-Benachrichtigung
 - E-Mail versenden
-- Backup übertragen
-- Erneuter Übertragungsversuch
+- Retry-Workflows
 - Weitere Automatisierungen
 
 ---
@@ -185,7 +200,11 @@ backup.completed
 
 ↓
 
-JSON Event
+Event Queue
+
+↓
+
+Event Dispatcher
 
 ↓
 
@@ -213,7 +232,11 @@ backup.failed
 
 ↓
 
-JSON Event
+Event Queue
+
+↓
+
+Event Dispatcher
 
 ↓
 
@@ -241,11 +264,19 @@ restore.completed
 
 ↓
 
-JSON Event
+Event Queue
+
+↓
+
+Event Dispatcher
 
 ↓
 
 n8n
+
+↓
+
+Discord
 ```
 
 ---
@@ -265,11 +296,19 @@ transfer.completed
 
 ↓
 
-JSON Event
+Event Queue
+
+↓
+
+Event Dispatcher
 
 ↓
 
 n8n
+
+↓
+
+Discord
 ```
 
 ---
@@ -285,7 +324,11 @@ system.disk.low
 
 ↓
 
-JSON Event
+Event Queue
+
+↓
+
+Event Dispatcher
 
 ↓
 
@@ -300,7 +343,7 @@ Discord
 
 # Event-Typen
 
-Aktuell werden unter anderem folgende Ereignisse verwendet.
+Aktuell werden folgende Ereignisse verwendet.
 
 ## Backup
 
@@ -374,6 +417,8 @@ Die Event-Architektur bietet mehrere Vorteile.
 - Lose gekoppelte Komponenten
 - Einheitliches Event-Format
 - Gemeinsame Event Library
+- Lokale Event Queue
+- Zuverlässige Ereignisverarbeitung
 - Hohe Erweiterbarkeit
 - Austauschbare Benachrichtigungssysteme
 - Zentrale Workflow-Verwaltung
@@ -388,7 +433,8 @@ Atlas trifft folgende Architekturentscheidungen.
 - Infrastruktur erzeugt ausschließlich Ereignisse.
 - Infrastruktur kennt keine externen Dienste.
 - Alle Komponenten verwenden die gemeinsame Event Library.
-- Ereignisse werden als JSON-Dateien erzeugt.
+- Ereignisse werden lokal als JSON-Dateien gespeichert.
+- Der Event Dispatcher übernimmt den Transport.
 - n8n verarbeitet sämtliche Ereignisse.
 - Benachrichtigungen erfolgen ausschließlich über n8n.
 - Neue Workflows können ergänzt werden, ohne bestehende Infrastruktur anzupassen.
@@ -403,11 +449,19 @@ Atlas trifft folgende Architekturentscheidungen.
 
 ✅ Event Library definiert
 
+✅ Event Queue definiert
+
+✅ Event Dispatcher definiert
+
 ✅ Event-Format definiert
 
 ## Implementierung
 
 ✅ Event Library implementiert
+
+✅ Event Queue implementiert
+
+✅ Event Dispatcher implementiert
 
 ✅ Backup integriert
 
@@ -415,7 +469,9 @@ Atlas trifft folgende Architekturentscheidungen.
 
 ✅ Transfer integriert
 
-⬜ n8n anbinden
+✅ n8n integriert
+
+✅ Discord Benachrichtigungen integriert
 
 ⬜ Monitoring integrieren
 

@@ -252,7 +252,11 @@ Backups aufbewahrt.
 
 # Event-System
 
-Während des Backup-Prozesses werden Ereignisse erzeugt.
+Während des Backup-Prozesses werden Ereignisse über die gemeinsame Event Library erzeugt.
+
+Diese werden zunächst als JSON-Dateien in der lokalen Event Queue gespeichert.
+
+Der Event Dispatcher überträgt sie anschließend an den zentralen n8n-Workflow, der weitere Aktionen wie Discord-Benachrichtigungen ausführt.
 
 Folgende Ereignisse werden aktuell verwendet.
 
@@ -262,7 +266,7 @@ Folgende Ereignisse werden aktuell verwendet.
 | `backup.completed` | Backup erfolgreich abgeschlossen |
 | `backup.failed` | Backup wurde aufgrund eines Fehlers beendet |
 
-Bei einem Fehler enthält der Payload zusätzlich den fehlgeschlagenen Verarbeitungsschritt.
+Bei einem Fehler enthält der Payload zusätzlich den internen Verarbeitungsschritt.
 
 Beispiel:
 
@@ -305,9 +309,10 @@ Vor jedem kritischen Verarbeitungsschritt werden mögliche Fehler überprüft.
 Bei einem Fehler
 
 - wird ein `backup.failed`-Event erzeugt,
-- das unvollständige Backup entfernt,
-- der Fehler an den Benutzer ausgegeben und
-- das Skript beendet.
+- wird das Ereignis in der Event Queue gespeichert,
+- wird das unvollständige Backup entfernt,
+- wird der Fehler an den Benutzer ausgegeben und
+- wird das Skript beendet.
 
 Dadurch verbleiben niemals unvollständige Backups im Backup-Verzeichnis.
 
@@ -319,7 +324,7 @@ Atlas trifft folgende Architekturentscheidungen.
 
 - Alle Backups werden vollständig verifiziert.
 - Unvollständige Backups werden automatisch entfernt.
-- Backup-Ereignisse werden über das Event-System veröffentlicht.
+- Backup-Ereignisse werden ausschließlich über das Event-System veröffentlicht.
 - PostgreSQL-Datenbanken werden automatisch erkannt.
 - Alte Backups werden automatisch rotiert.
 - Das Backup enthält ausschließlich nicht rekonstruierbare Daten.

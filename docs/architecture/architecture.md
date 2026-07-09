@@ -37,7 +37,7 @@ Jede Komponente besitzt genau eine klar definierte Aufgabe und kennt keine inter
 |------------|---------------|
 | Traefik | Routing, HTTPS und Reverse Proxy |
 | PostgreSQL | Persistente Datenspeicherung |
-| n8n | Workflow- und Automatisierungsplattform |
+| n8n | Verarbeitung von Infrastruktur-Events und Workflow-Automatisierung |
 | Backup Engine | Erstellung und Verifikation von Backups |
 | Restore Engine | Wiederherstellung von Backups |
 | Transfer Engine | Übertragung lokaler Backups |
@@ -83,8 +83,24 @@ Atlas besteht aus mehreren logisch getrennten Ebenen.
  Backup Engine
  Restore Engine
  Transfer Engine
+        │
+        ▼
  Event Library
- Event Queue
+        │
+        ▼
+  Event Queue
+        │
+        ▼
+ Event Dispatcher
+        │
+        ▼
+      n8n Workflow
+        │
+        ▼
+ Discord
+
+──────────────────────────────────────────────────────
+
  systemd
 ```
 
@@ -92,7 +108,7 @@ Containerisierte Dienste kommunizieren ausschließlich über das gemeinsame Dock
 
 Traefik bildet den zentralen Einstiegspunkt für sämtliche Webanwendungen.
 
-Zeitgesteuerte Aufgaben wie Backups, Restore, Backup-Übertragungen und zukünftige Monitoring-Aufgaben werden unabhängig von Docker über systemd ausgeführt.
+Zeitgesteuerte Aufgaben wie Backups, Restore, Backup-Übertragungen, Event-Dispatching und zukünftige Monitoring-Aufgaben werden unabhängig von Docker über systemd ausgeführt.
 
 ---
 
@@ -113,11 +129,11 @@ Die Infrastruktur stellt gemeinsam genutzte Dienste und Plattformkomponenten fü
 - Transfer Engine
 - Event Library
 - Event Queue
+- Event Dispatcher
 - systemd
 
 ## Geplante Komponenten
 
-- Event Dispatcher
 - Monitoring
 - Redis
 
@@ -239,9 +255,11 @@ Dadurch bleiben Compose-Dateien unabhängig von vertraulichen Informationen und 
 
 Alle Infrastruktur-Komponenten kommunizieren über standardisierte Ereignisse.
 
-Sie erzeugen ausschließlich Events und besitzen keine Kenntnis über nachgelagerte Workflows oder Benachrichtigungssysteme.
+Die Komponenten erzeugen ausschließlich Events und besitzen keine Kenntnis über nachgelagerte Systeme.
 
-Dadurch bleiben Infrastruktur und Automatisierung vollständig voneinander getrennt.
+Die Verarbeitung der Ereignisse erfolgt entkoppelt über die Event Queue, den Event Dispatcher und n8n-Workflows.
+
+Dadurch bleiben Infrastruktur, Transport und Automatisierung vollständig voneinander getrennt.
 
 ---
 

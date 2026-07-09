@@ -117,6 +117,7 @@ transfer.completed
 Tritt während der Übertragung ein Fehler auf, wird
 
 - ein `transfer.failed`-Event erzeugt,
+- das Ereignis in der Event Queue gespeichert,
 - der Transfer beendet und
 - der Fehler ausgegeben.
 
@@ -144,7 +145,7 @@ Fehlende Backups führen zu einem Fehler und beenden den Transfer.
 
 Vor Beginn der Übertragung wird überprüft, ob das Backup-Ziel erreichbar ist.
 
-Ist das Ziel nicht verfügbar, wird der Transfer übersprungen.
+Ist das Ziel nicht verfügbar, wird der Transfer beendet.
 
 Beispiel:
 
@@ -156,13 +157,17 @@ Backup destination unavailable.
 Transfer skipped.
 ```
 
-Dadurch kann die Transfer Engine regelmäßig ausgeführt werden, ohne Fehler zu erzeugen, wenn das externe Backup-Ziel vorübergehend nicht verfügbar ist.
+In diesem Fall wird zusätzlich ein `transfer.failed`-Event erzeugt, damit der fehlgeschlagene Transfer zentral protokolliert und über nachgelagerte Workflows (z. B. Discord) verarbeitet werden kann.
 
 ---
 
 # Event-System
 
-Während des Transfer-Prozesses werden Ereignisse erzeugt.
+Während des Transfer-Prozesses werden Ereignisse über die gemeinsame Event Library erzeugt.
+
+Diese werden zunächst als JSON-Dateien in der lokalen Event Queue gespeichert.
+
+Der Event Dispatcher überträgt sie anschließend an den zentralen n8n-Workflow, der weitere Aktionen wie Discord-Benachrichtigungen ausführt.
 
 Folgende Ereignisse werden aktuell verwendet.
 
@@ -172,7 +177,7 @@ Folgende Ereignisse werden aktuell verwendet.
 | `transfer.completed` | Transfer erfolgreich abgeschlossen |
 | `transfer.failed` | Transfer aufgrund eines Fehlers beendet |
 
-Bei einem Fehler enthält der Payload zusätzlich den fehlgeschlagenen Verarbeitungsschritt.
+Bei einem Fehler enthält der Payload zusätzlich den internen Verarbeitungsschritt.
 
 Beispiel:
 
@@ -227,12 +232,13 @@ Vor jedem kritischen Verarbeitungsschritt werden mögliche Fehler überprüft.
 Bei einem Fehler
 
 - wird ein `transfer.failed`-Event erzeugt,
-- der Fehler ausgegeben und
-- das Skript beendet.
+- wird das Ereignis in der Event Queue gespeichert,
+- wird der Fehler ausgegeben und
+- wird das Skript beendet.
 
 Ein unvollständiger Transfer wird niemals als erfolgreich betrachtet.
 
-Ist das Backup-Ziel nicht erreichbar, wird der Transfer bewusst übersprungen und beendet sich ohne Fehler.
+Kann das Backup-Ziel nicht erreicht werden, wird der Transfer kontrolliert beendet und als fehlgeschlagener Transfer dokumentiert.
 
 ---
 
@@ -244,8 +250,7 @@ Atlas trifft folgende Architekturentscheidungen.
 - Lokale Backups besitzen höchste Priorität.
 - Externe Backups erfolgen unabhängig von der Backup-Erstellung.
 - Bereits übertragene Backups werden nicht erneut kopiert.
-- Nicht erreichbare Backup-Ziele erzeugen keinen Fehler.
-- Alle Transfer-Ereignisse werden über das Event-System veröffentlicht.
+- Alle Transfer-Ereignisse werden ausschließlich über das Event-System veröffentlicht.
 - Die Transfer Engine kennt ausschließlich Quelle und Ziel der Übertragung.
 
 ---
@@ -269,5 +274,9 @@ Atlas trifft folgende Architekturentscheidungen.
 ✅ Übertragungsverifikation implementiert
 
 ✅ Event-System integriert
+
+✅ Event Dispatcher integriert
+
+✅ n8n integriert
 
 ⬜ Weitere Backup-Ziele integrieren

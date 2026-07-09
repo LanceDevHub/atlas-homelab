@@ -2,7 +2,7 @@
 
 Dieses Dokument beschreibt den Transport von Ereignissen innerhalb der Atlas-Plattform.
 
-Es definiert, wie Infrastruktur-Komponenten Ereignisse erzeugen, lokal speichern und später an externe Workflow-Systeme weitergeleitet werden.
+Es definiert, wie Infrastruktur-Komponenten Ereignisse erzeugen, lokal speichern und anschließend an die zentrale Workflow-Plattform weiterleiten.
 
 Die Struktur eines Ereignisses wird im Dokument
 
@@ -29,7 +29,7 @@ Der Event-Transport verfolgt folgende Ziele.
 
 # Architektur
 
-Der Event-Transport besteht aus vier Komponenten.
+Der Event-Transport besteht aus fünf Komponenten.
 
 ```text
 Infrastruktur
@@ -56,7 +56,13 @@ Event Dispatcher
 
         ▼
 
-Workflow-Plattform
+HTTP Webhook
+
+        │
+
+        ▼
+
+n8n
 ```
 
 Jede Komponente besitzt genau eine Verantwortung.
@@ -97,11 +103,11 @@ Aktuell umfasst sie folgende Funktionen:
 Die Library
 
 - erzeugt Zeitstempel,
-- erstellt Dateinamen,
-- erzeugt das JSON-Ereignis,
+- erzeugt Dateinamen,
+- erstellt das JSON-Ereignis,
 - legt das Ereignis in der Event Queue ab.
 
-Sie kennt keine Transportprotokolle und keine Workflow-Systeme.
+Sie kennt weder Transportprotokolle noch Workflow-Systeme.
 
 ---
 
@@ -119,8 +125,8 @@ Beispiel:
 
 ```text
 events/
-├── 20260704T030001123456789.json
-├── 20260704T030503987654321.json
+├── 20260709T030001123456789.json
+├── 20260709T030503987654321.json
 └── ...
 ```
 
@@ -130,25 +136,30 @@ Dadurch bleiben Ereignisse auch nach einem Neustart des Systems erhalten.
 
 ## Event Dispatcher
 
-Der Event Dispatcher liest neue Ereignisse aus der Event Queue.
+Der Event Dispatcher verarbeitet alle Ereignisse innerhalb der Event Queue.
 
-Er überträgt diese an die Workflow-Plattform.
+Für jedes Event wird ein HTTP-POST an den zentralen n8n-Webhook gesendet.
 
-Nach erfolgreicher Verarbeitung wird das Ereignis aus der Event Queue entfernt.
+Nach erfolgreicher Verarbeitung wird die entsprechende Event-Datei gelöscht.
 
-Der Dispatcher ist aktuell noch nicht implementiert.
+Schlägt die Übertragung fehl, verbleibt das Ereignis in der Queue und wird beim nächsten Durchlauf erneut verarbeitet.
+
+Der Dispatcher wird regelmäßig über einen systemd Timer ausgeführt.
 
 ---
 
 ## Workflow-Plattform
 
-Die Workflow-Plattform verarbeitet eingehende Ereignisse.
+Aktuell verwendet Atlas n8n als zentrale Workflow-Plattform.
 
-Geplant ist aktuell:
+n8n verarbeitet eingehende Ereignisse und entscheidet über die weitere Verarbeitung.
 
-- n8n
+Beispiele:
 
-Die Workflow-Plattform entscheidet selbst, welche Aktionen ausgeführt werden.
+- Discord-Benachrichtigung
+- E-Mail
+- Retry-Workflows
+- Weitere Automatisierungen
 
 ---
 
@@ -193,13 +204,13 @@ Event Dispatcher
 
         ▼
 
-HTTP
+HTTP POST
 
         │
 
         ▼
 
-n8n
+n8n Webhook
 
         │
 
@@ -220,17 +231,26 @@ Die Event Queue befindet sich unter
 
 Jede JSON-Datei repräsentiert genau ein Ereignis.
 
-Die Dateinamen werden automatisch erzeugt und bestehen aus einem UTC-Zeitstempel mit Nanosekundenauflösung.
+Die Dateinamen werden automatisch erzeugt und bestehen aus einem Zeitstempel mit Nanosekundenauflösung.
 
 Dadurch sind sie chronologisch sortierbar und praktisch eindeutig.
+
+Die Queue dient gleichzeitig als Persistenzschicht zwischen Infrastruktur und Workflow-Plattform.
 
 ---
 
 # Fehlerbehandlung
 
-Kann ein Ereignis nicht übertragen werden, verbleibt es in der Event Queue.
+Kann ein Ereignis nicht übertragen werden, verbleibt es unverändert in der Event Queue.
 
-Der Dispatcher versucht die Übertragung später erneut.
+Mögliche Ursachen sind beispielsweise:
+
+- n8n nicht erreichbar
+- Netzwerkfehler
+- HTTP-Fehler
+- Workflow nicht verfügbar
+
+Der Dispatcher versucht die Übertragung beim nächsten Durchlauf erneut.
 
 Dadurch gehen keine Ereignisse verloren.
 
@@ -240,16 +260,16 @@ Das Erzeugen eines Ereignisses beeinflusst die Infrastruktur-Komponenten nicht.
 
 # Transport
 
-Das Event-Format ist vollständig unabhängig vom Transportweg.
+Das Event-Format ist vollständig unabhängig vom verwendeten Transportweg.
 
-Aktuell existiert lediglich die lokale Event Queue.
+Aktuell verwendet Atlas HTTP-Webhooks zur Kommunikation mit n8n.
 
-Geplante Transportwege:
+Zukünftige Transportwege könnten beispielsweise sein:
 
-- HTTP / HTTPS
 - MQTT
-- Redis
+- Redis Streams
 - RabbitMQ
+- Apache Kafka
 
 Die Infrastruktur-Komponenten müssen hierfür nicht angepasst werden.
 
@@ -264,8 +284,9 @@ Atlas trifft folgende Architekturentscheidungen.
 - Jedes Ereignis wird als einzelne JSON-Datei abgelegt.
 - Die Event Queue dient als Puffer zwischen Infrastruktur und Workflow-Plattform.
 - Die Event Library kennt keine Transportprotokolle.
-- Der Event Dispatcher übernimmt ausschließlich die Übertragung.
-- Die Workflow-Plattform verarbeitet ausschließlich eingehende Ereignisse.
+- Der Event Dispatcher übernimmt ausschließlich den Transport.
+- n8n verarbeitet ausschließlich eingehende Ereignisse.
+- Ereignisse werden erst nach erfolgreicher Verarbeitung aus der Queue entfernt.
 
 ---
 
@@ -285,8 +306,10 @@ Atlas trifft folgende Architekturentscheidungen.
 
 ✅ Event Queue implementiert
 
-⬜ Event Dispatcher implementieren
+✅ Event Dispatcher implementiert
 
-⬜ HTTP-Transport implementieren
+✅ HTTP-Transport implementiert
 
-⬜ n8n anbinden
+✅ n8n integriert
+
+✅ Discord integriert

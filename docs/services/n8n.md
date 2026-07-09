@@ -4,13 +4,18 @@
 
 n8n ist die zentrale Workflow- und Automatisierungsplattform der Atlas-Infrastruktur.
 
-Sie ermöglicht die Erstellung, Ausführung und Verwaltung automatisierter Workflows und bildet die Grundlage für zukünftige Automatisierungen innerhalb von Atlas.
+Sie verarbeitet eingehende Infrastruktur-Ereignisse und führt darauf basierend automatisierte Workflows aus.
+
+Aktuelle Einsatzbereiche:
+
+- Verarbeitung von Infrastruktur-Events
+- Discord-Benachrichtigungen
+- Workflow-Orchestrierung
 
 Geplante Einsatzbereiche:
 
 - Systemautomatisierung
 - API-Integrationen
-- Benachrichtigungen
 - Datenverarbeitung
 - Eigene Workflows
 
@@ -149,6 +154,85 @@ TLS-Zertifikate, HTTP-Weiterleitungen sowie Security Header werden zentral durch
 
 ---
 
+# Event-Integration
+
+n8n bildet die zentrale Verarbeitungsebene des Atlas Event-Systems.
+
+Alle Infrastruktur-Komponenten erzeugen ausschließlich standardisierte Events.
+
+Diese werden zunächst lokal gespeichert und anschließend vom Event Dispatcher per HTTP-Webhook an n8n übertragen.
+
+```text
+Backup / Restore / Transfer
+            │
+            ▼
+      Event Library
+            │
+            ▼
+       Event Queue
+            │
+            ▼
+     Event Dispatcher
+            │
+            ▼
+        HTTP Webhook
+            │
+            ▼
+            n8n
+```
+
+n8n besitzt keine Kenntnis über die Infrastruktur-Komponenten.
+
+Es verarbeitet ausschließlich eingehende Events.
+
+---
+
+# Workflow-Aufbau
+
+Der zentrale Workflow besitzt folgenden Aufbau.
+
+```text
+Webhook
+
+↓
+
+Event Router
+
+├── Backup Success
+├── Backup Failure
+├── Restore Failure
+└── Transfer Failure
+```
+
+Der Event Router entscheidet anhand des Event-Typs, welcher Teil des Workflows ausgeführt wird.
+
+---
+
+# Discord-Benachrichtigungen
+
+Aktuell erzeugt n8n Benachrichtigungen für folgende Ereignisse.
+
+## Backup
+
+- backup.completed
+- backup.failed
+
+## Restore
+
+- restore.failed
+
+## Transfer
+
+- transfer.failed
+
+Jeder Workflow erzeugt eine einheitlich formatierte Discord-Nachricht.
+
+Fehlerereignisse werden vor dem Versand über Formatter-Nodes aufbereitet.
+
+Dadurch können interne Schrittbezeichnungen in lesbare Beschreibungen übersetzt werden.
+
+---
+
 # Architekturentscheidungen
 
 ## Containerisierung
@@ -211,6 +295,16 @@ Dadurch kann die Compose-Datei versioniert werden, ohne vertrauliche Information
 
 ---
 
+## Event-Verarbeitung
+
+n8n verarbeitet ausschließlich eingehende Infrastruktur-Ereignisse.
+
+Die Infrastruktur kennt weder n8n noch Discord oder andere externe Systeme.
+
+Dadurch bleiben Infrastruktur und Automatisierung vollständig voneinander entkoppelt.
+
+---
+
 # Status
 
 ✅ n8n erfolgreich integriert
@@ -226,3 +320,11 @@ Dadurch kann die Compose-Datei versioniert werden, ohne vertrauliche Information
 ✅ Docker Labels für automatisches Routing eingerichtet
 
 ✅ HTTP Security Header werden zentral durch Traefik bereitgestellt
+
+✅ Webhook für Event Dispatcher eingerichtet
+
+✅ Event Router implementiert
+
+✅ Discord-Benachrichtigungen integriert
+
+✅ Formatter für Fehlerereignisse implementiert

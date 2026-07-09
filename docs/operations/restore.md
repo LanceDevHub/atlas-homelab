@@ -107,6 +107,7 @@ Jeder Schritt muss erfolgreich abgeschlossen werden.
 Tritt während eines Schrittes ein Fehler auf, wird
 
 - ein `restore.failed`-Event erzeugt,
+- das Ereignis in der Event Queue gespeichert,
 - der Restore sofort beendet und
 - der Fehler ausgegeben.
 
@@ -278,7 +279,11 @@ Erst wenn alle Dienste erfolgreich laufen, gilt der Restore als abgeschlossen.
 
 # Event-System
 
-Während des Restore-Prozesses werden Ereignisse erzeugt.
+Während des Restore-Prozesses werden Ereignisse über die gemeinsame Event Library erzeugt.
+
+Diese werden zunächst als JSON-Dateien in der lokalen Event Queue gespeichert.
+
+Der Event Dispatcher überträgt sie anschließend an den zentralen n8n-Workflow, der weitere Aktionen wie Discord-Benachrichtigungen ausführt.
 
 Folgende Ereignisse werden aktuell verwendet.
 
@@ -288,7 +293,7 @@ Folgende Ereignisse werden aktuell verwendet.
 | `restore.completed` | Restore erfolgreich abgeschlossen |
 | `restore.failed` | Restore aufgrund eines Fehlers beendet |
 
-Bei einem Fehler enthält der Payload zusätzlich den fehlgeschlagenen Verarbeitungsschritt.
+Bei einem Fehler enthält der Payload zusätzlich den internen Verarbeitungsschritt.
 
 Beispiel:
 
@@ -332,8 +337,9 @@ Vor jedem kritischen Verarbeitungsschritt werden mögliche Fehler überprüft.
 Bei einem Fehler
 
 - wird ein `restore.failed`-Event erzeugt,
-- der Fehler ausgegeben und
-- das Skript beendet.
+- wird das Ereignis in der Event Queue gespeichert,
+- wird der Fehler ausgegeben und
+- wird das Skript beendet.
 
 Ein unvollständiger Restore wird niemals als erfolgreich betrachtet.
 
@@ -345,7 +351,7 @@ Atlas trifft folgende Architekturentscheidungen.
 
 - Vor jedem Restore wird das Backup vollständig validiert.
 - Vor jedem Restore wird automatisch ein Pre-Restore-Backup erstellt.
-- Restore-Ereignisse werden über das Event-System veröffentlicht.
+- Restore-Ereignisse werden ausschließlich über das Event-System veröffentlicht.
 - Mehrere PostgreSQL-Datenbanken werden automatisch erkannt.
 - Der Restore wird nach erfolgreichem Abschluss automatisch verifiziert.
 
@@ -378,6 +384,10 @@ Atlas trifft folgende Architekturentscheidungen.
 ✅ Restore-Verifikation
 
 ✅ Event-System integriert
+
+✅ Event Dispatcher integriert
+
+✅ n8n integriert
 
 ---
 

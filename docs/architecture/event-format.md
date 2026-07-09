@@ -81,12 +81,14 @@ container.started
 
 Zeitpunkt der Ereigniserzeugung.
 
-Verwendet wird das ISO-8601-Format (UTC).
+Verwendet wird das ISO-8601-Format mit Zeitzonenoffset.
+
+Die Zeitzone richtet sich nach der Systemkonfiguration (`Europe/Berlin`) und berücksichtigt automatisch Sommer- und Winterzeit.
 
 Beispiel:
 
 ```text
-2026-07-04T03:00:00Z
+2026-07-09T14:30:15+02:00
 ```
 
 ---
@@ -134,7 +136,7 @@ Typische Beispiele:
 
 ```json
 {
-    "directory": "2026-07-04_03-00-00"
+    "directory": "2026-07-09_03-00-00"
 }
 ```
 
@@ -159,7 +161,7 @@ Ein leeres Payload wird als leeres JSON-Objekt (`{}`) gespeichert.
 ```json
 {
     "event": "backup.started",
-    "timestamp": "2026-07-04T03:00:00Z",
+    "timestamp": "2026-07-09T03:00:00+02:00",
     "source": "atlas-backup",
     "status": "info",
     "payload": {}
@@ -173,11 +175,11 @@ Ein leeres Payload wird als leeres JSON-Objekt (`{}`) gespeichert.
 ```json
 {
     "event": "backup.completed",
-    "timestamp": "2026-07-04T03:00:00Z",
+    "timestamp": "2026-07-09T03:00:25+02:00",
     "source": "atlas-backup",
     "status": "success",
     "payload": {
-        "directory": "2026-07-04_03-00-00"
+        "directory": "2026-07-09_03-00-00"
     }
 }
 ```
@@ -189,11 +191,27 @@ Ein leeres Payload wird als leeres JSON-Objekt (`{}`) gespeichert.
 ```json
 {
     "event": "backup.failed",
-    "timestamp": "2026-07-04T03:00:00Z",
+    "timestamp": "2026-07-09T03:00:12+02:00",
     "source": "atlas-backup",
     "status": "error",
     "payload": {
         "step": "backup_postgres"
+    }
+}
+```
+
+---
+
+## Restore fehlgeschlagen
+
+```json
+{
+    "event": "restore.failed",
+    "timestamp": "2026-07-09T10:42:31+02:00",
+    "source": "atlas-restore",
+    "status": "error",
+    "payload": {
+        "step": "restore_postgres"
     }
 }
 ```
@@ -205,12 +223,10 @@ Ein leeres Payload wird als leeres JSON-Objekt (`{}`) gespeichert.
 ```json
 {
     "event": "transfer.completed",
-    "timestamp": "2026-07-04T03:15:42Z",
+    "timestamp": "2026-07-09T03:15:42+02:00",
     "source": "atlas-transfer",
     "status": "success",
-    "payload": {
-        "directory": "2026-07-04_03-00-00"
-    }
+    "payload": {}
 }
 ```
 
@@ -299,6 +315,7 @@ Atlas trifft folgende Architekturentscheidungen.
 - Das Event-Format ist unabhängig vom Transportweg.
 - Infrastruktur-Komponenten erzeugen Events ausschließlich über die gemeinsame Event-Bibliothek.
 - Die Verarbeitung erfolgt außerhalb der Infrastruktur-Komponenten.
+- Ereignisse enthalten ausschließlich fachliche Informationen und keine transport- oder workflowbezogenen Daten.
 
 ---
 
@@ -316,6 +333,10 @@ Atlas trifft folgende Architekturentscheidungen.
 
 ✅ Event Library implementiert
 
+✅ Event Queue implementiert
+
+✅ Event Dispatcher implementiert
+
 ✅ Event Transport implementiert
 
 ✅ Backup Engine integriert
@@ -324,4 +345,6 @@ Atlas trifft folgende Architekturentscheidungen.
 
 ✅ Transfer Engine integriert
 
-⬜ n8n Workflow anbinden
+✅ n8n Workflow integriert
+
+✅ Discord Benachrichtigungen integriert
