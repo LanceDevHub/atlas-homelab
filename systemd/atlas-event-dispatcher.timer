@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Atlas Event Dispatcher every minute
+
+[Timer]
+OnCalendar=*-*-* *:*:00
+Persistent=true
+
+Unit=atlas-event-dispatcher.service
+
+[Install]
+WantedBy=timers.target

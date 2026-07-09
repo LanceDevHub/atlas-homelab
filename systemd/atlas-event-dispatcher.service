@@ -1,0 +1,18 @@
+[Unit]
+Description=Atlas Event Dispatcher
+Documentation=https://github.com/LanceDevHub/Atlas
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+
+User=lenny
+Group=lenny
+
+ExecStart=/opt/atlas/scripts/event-dispatcher.sh
+
+WorkingDirectory=/opt/atlas/scripts
+
+[Install]
+WantedBy=multi-user.target
